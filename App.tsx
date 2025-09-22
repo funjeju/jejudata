@@ -13,10 +13,12 @@ import Modal from './components/common/Modal';
 import Button from './components/common/Button';
 import { generateDraft } from './services/geminiService';
 import { KLokalLogo, WITH_KIDS_OPTIONS, WITH_PETS_OPTIONS, PARKING_DIFFICULTY_OPTIONS, ADMISSION_FEE_OPTIONS } from './constants';
-import { collection, query, onSnapshot, setDoc, doc, deleteDoc } from "firebase/firestore";
+import { collection, query, onSnapshot, setDoc, doc, deleteDoc, getDocs } from "firebase/firestore";
 import { db } from './services/firebase';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { sanitizePlaceForFirestore, parsePlaceFromFirestore } from './services/placeFirestore';
+import { testWeatherAPI, getCurrentWeather, JEJU_WEATHER_STATIONS } from './services/weatherService';
+import { testCapture, captureWeatherScene } from './services/youtubeCapture';
 
 type AppStep = 'library' | 'initial' | 'loading' | 'review' | 'view';
 
@@ -58,31 +60,85 @@ const App: React.FC = () => {
   const [isWeatherChatOpen, setIsWeatherChatOpen] = useState(false);
   const [isTripPlannerOpen, setIsTripPlannerOpen] = useState(false);
   const [weatherSources, setWeatherSources] = useState<WeatherSource[]>([]);
-// Firestore에서 스팟 데이터 불러오기
+  const [isLoadingSpots, setIsLoadingSpots] = useState(true);
+// 스팟 데이터 불러오기 (임시로 로컬 스토리지 사용)
   useEffect(() => {
-    const q = query(collection(db, "spots"));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const spotsArray: Place[] = querySnapshot.docs.map((docSnap) =>
-        parsePlaceFromFirestore(docSnap.data(), docSnap.id)
-      );
-      setSpots(spotsArray);
-    }, (snapshotError) => {
-      console.error('Error loading spots from Firestore:', snapshotError);
-    });
-    return () => unsubscribe();
+    const loadSpots = async () => {
+      try {
+        // 먼저 로컬 스토리지에서 데이터 확인
+        const localData = localStorage.getItem('jejuSpots');
+        if (localData) {
+          const spotsArray: Place[] = JSON.parse(localData);
+          setSpots(spotsArray);
+          setIsLoadingSpots(false);
+          console.log(`로컬 스토리지에서 ${spotsArray.length}개의 스팟을 불러왔습니다.`);
+          return;
+        }
+
+        // 로컬 데이터가 없으면 Firestore에서 시도
+        console.log('Firestore에서 데이터를 불러오는 중...');
+        const q = query(collection(db, "spots"));
+        const querySnapshot = await getDocs(q);
+        const spotsArray: Place[] = querySnapshot.docs.map((docSnap) =>
+          parsePlaceFromFirestore(docSnap.data(), docSnap.id)
+        );
+        setSpots(spotsArray);
+
+        // 로컬 스토리지에 저장
+        localStorage.setItem('jejuSpots', JSON.stringify(spotsArray));
+
+        setIsLoadingSpots(false);
+        console.log(`Firestore에서 ${spotsArray.length}개의 스팟을 불러왔습니다.`);
+      } catch (error) {
+        console.error('Error loading spots:', error);
+
+        // Firestore 오류 시 빈 배열로 시작
+        setSpots([]);
+        setIsLoadingSpots(false);
+        console.log('Firestore 연결 실패. 빈 상태로 시작합니다.');
+      }
+    };
+
+    loadSpots();
   }, []);
 
-  // Firestore에서 날씨 정보 소스 불러오기
+  // 날씨 소스 데이터 불러오기 (로컬 스토리지 우선)
   useEffect(() => {
-    const q = query(collection(db, "weatherSources"));
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const sourcesArray: WeatherSource[] = [];
-      querySnapshot.forEach((doc) => {
-        sourcesArray.push(doc.data() as WeatherSource);
-      });
-      setWeatherSources(sourcesArray);
-    });
-    return () => unsubscribe();
+    const loadWeatherSources = async () => {
+      try {
+        // 먼저 로컬 스토리지에서 데이터 확인
+        const localData = localStorage.getItem('jejuWeatherSources');
+        if (localData) {
+          const sourcesArray: WeatherSource[] = JSON.parse(localData);
+          setWeatherSources(sourcesArray);
+          console.log(`로컬 스토리지에서 날씨 소스 ${sourcesArray.length}개를 불러왔습니다.`);
+          return;
+        }
+
+        // 로컬 데이터가 없으면 Firestore에서 시도
+        console.log('Firestore에서 날씨 소스를 불러오는 중...');
+        const q = query(collection(db, "weatherSources"));
+        const querySnapshot = await getDocs(q);
+        const sourcesArray: WeatherSource[] = [];
+        querySnapshot.forEach((doc) => {
+          sourcesArray.push(doc.data() as WeatherSource);
+        });
+        setWeatherSources(sourcesArray);
+
+        // 로컬 스토리지에 저장
+        localStorage.setItem('jejuWeatherSources', JSON.stringify(sourcesArray));
+
+        console.log(`Firestore에서 날씨 소스 ${sourcesArray.length}개를 불러왔습니다.`);
+      } catch (error) {
+        console.error('Error loading weather sources:', error);
+
+        // Firestore 오류 시 빈 배열로 시작
+        setWeatherSources([]);
+        console.log('날씨 소스 Firestore 연결 실패. 빈 상태로 시작합니다.');
+      }
+    };
+
+    loadWeatherSources();
   }, []);
   const handleGenerateDraft = useCallback(async (formData: InitialFormData) => {
 
@@ -159,22 +215,102 @@ const App: React.FC = () => {
     }
   }, [step]);
 
-  // Firestore에 데이터 저장 함수 추가
+  // 데이터 저장 함수 (로컬 스토리지 + Firestore 백업)
   const handleSaveToFirebase = async (data: Place) => {
-      const docId = data.place_id;
-      const sanitized = sanitizePlaceForFirestore(data);
-      await setDoc(doc(db, "spots", docId), sanitized);
+      try {
+        // 로컬 상태 업데이트
+        setSpots(prevSpots => {
+          const updatedSpots = prevSpots.filter(spot => spot.place_id !== data.place_id);
+          const newSpots = [...updatedSpots, data];
+
+          // 로컬 스토리지에 저장
+          localStorage.setItem('jejuSpots', JSON.stringify(newSpots));
+
+          return newSpots;
+        });
+
+        // Firestore에도 백업 저장 시도
+        try {
+          const docId = data.place_id;
+          const sanitized = sanitizePlaceForFirestore(data);
+          await setDoc(doc(db, "spots", docId), sanitized);
+          console.log('Firestore에 백업 저장 완료');
+        } catch (firestoreError) {
+          console.warn('Firestore 백업 저장 실패:', firestoreError);
+        }
+
+        console.log('데이터 저장 완료');
+      } catch (error) {
+        console.error('데이터 저장 오류:', error);
+      }
+  };
+
+  // 스팟 목록 새로고침 함수
+  const refreshSpots = async () => {
+    const localData = localStorage.getItem('jejuSpots');
+    if (localData) {
+      const spotsArray: Place[] = JSON.parse(localData);
+      setSpots(spotsArray);
+      console.log(`로컬 데이터 새로고침: ${spotsArray.length}개`);
+    }
   };
   
-  // 날씨 소스 데이터 Firestore에 저장 함수 추가
+  // 날씨 소스 데이터 저장 함수 (로컬 스토리지 + Firestore 백업)
   const handleSaveWeatherSourceToFirebase = async (data: Omit<WeatherSource, 'id'> & { id?: string }) => {
-      const id = data.id || `ws_${Date.now()}`;
-      await setDoc(doc(db, "weatherSources", id), { ...data, id });
+      try {
+        const id = data.id || `ws_${Date.now()}`;
+        const weatherSourceData = { ...data, id };
+
+        // 로컬 상태 업데이트
+        setWeatherSources(prevSources => {
+          const updatedSources = prevSources.filter(source => source.id !== id);
+          const newSources = [...updatedSources, weatherSourceData as WeatherSource];
+
+          // 로컬 스토리지에 저장
+          localStorage.setItem('jejuWeatherSources', JSON.stringify(newSources));
+
+          return newSources;
+        });
+
+        // Firestore에도 백업 저장 시도
+        try {
+          await setDoc(doc(db, "weatherSources", id), weatherSourceData);
+          console.log('날씨 소스 Firestore에 백업 저장 완료');
+        } catch (firestoreError) {
+          console.warn('날씨 소스 Firestore 백업 저장 실패:', firestoreError);
+        }
+
+        console.log('날씨 소스 저장 완료');
+      } catch (error) {
+        console.error('날씨 소스 저장 오류:', error);
+      }
   };
-  
-  // 날씨 소스 데이터 Firestore에서 삭제 함수 추가
+
+  // 날씨 소스 데이터 삭제 함수 (로컬 스토리지 + Firestore)
   const handleDeleteWeatherSourceFromFirebase = async (id: string) => {
-      await deleteDoc(doc(db, "weatherSources", id));
+      try {
+        // 로컬 상태 업데이트
+        setWeatherSources(prevSources => {
+          const updatedSources = prevSources.filter(source => source.id !== id);
+
+          // 로컬 스토리지에 저장
+          localStorage.setItem('jejuWeatherSources', JSON.stringify(updatedSources));
+
+          return updatedSources;
+        });
+
+        // Firestore에서도 삭제 시도
+        try {
+          await deleteDoc(doc(db, "weatherSources", id));
+          console.log('날씨 소스 Firestore에서 삭제 완료');
+        } catch (firestoreError) {
+          console.warn('날씨 소스 Firestore 삭제 실패:', firestoreError);
+        }
+
+        console.log('날씨 소스 삭제 완료');
+      } catch (error) {
+        console.error('날씨 소스 삭제 오류:', error);
+      }
   };
   
   // 수정: 이미지 업로드를 처리하기 위해 함수를 async 비동기 방식으로 변경합니다.
@@ -400,13 +536,53 @@ const App: React.FC = () => {
   const handleDeleteWeatherSource = (id: string) => {
       handleDeleteWeatherSourceFromFirebase(id);
   };
+
+  // 개발 모드에서 전역 함수로 기상청 API 테스트 추가
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).testWeatherAPI = testWeatherAPI;
+      (window as any).getCurrentWeather = getCurrentWeather;
+      (window as any).JEJU_WEATHER_STATIONS = JEJU_WEATHER_STATIONS;
+      (window as any).testCapture = testCapture;
+      (window as any).captureWeatherScene = captureWeatherScene;
+      console.log('🌤️ 날씨 시스템 테스트 함수가 전역으로 등록되었습니다:');
+      console.log('📊 기상청 API:');
+      console.log('  - window.testWeatherAPI(): 제주 날씨 테스트');
+      console.log('  - window.getCurrentWeather("제주"): 특정 지역 날씨');
+      console.log('  - window.JEJU_WEATHER_STATIONS: 사용 가능한 관측소 목록');
+      console.log('🎥 YouTube 캡처 & 오버레이:');
+      console.log('  - window.testCapture(): YouTube 캡처 테스트');
+      console.log('  - window.captureWeatherScene(url, title): 실제 캡처 실행');
+    }
+  }, []);
   const renderContent = () => {
     switch (step) {
       case 'library':
-        return <ContentLibrary 
-                  spots={spots} 
-                  onAddNew={handleStartNew} 
-                  onEdit={handleEditSpot} 
+        if (isLoadingSpots) {
+          return (
+            <div className="text-center p-10">
+              <Spinner />
+              <p className="text-lg text-gray-600 mt-4">Firestore에서 데이터를 불러오는 중입니다...</p>
+            </div>
+          );
+        }
+        if (error) {
+          return (
+            <div className="text-center p-10">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                <p className="text-red-600 font-semibold mb-2">오류가 발생했습니다</p>
+                <p className="text-red-500 mb-4">{error}</p>
+                <Button onClick={() => window.location.reload()} variant="primary">
+                  새로고침
+                </Button>
+              </div>
+            </div>
+          );
+        }
+        return <ContentLibrary
+                  spots={spots}
+                  onAddNew={handleStartNew}
+                  onEdit={handleEditSpot}
                   onView={handleViewSpot}
                   onOpenWeatherChat={() => setIsWeatherChatOpen(true)}
                   onOpenTripPlanner={() => setIsTripPlannerOpen(true)}

@@ -7,6 +7,7 @@ import AddWeatherSourceModal from './AddWeatherSourceModal';
 import WeatherSourceListModal from './WeatherSourceListModal';
 import WeatherCard from './WeatherCard';
 import LiveWeatherViewModal from './LiveWeatherViewModal';
+import { captureWeatherScene } from '../services/youtubeCapture';
 
 // The API key is sourced from the environment variable `process.env.API_KEY`.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -37,6 +38,7 @@ interface Message {
   role: 'user' | 'ai';
   content: string;
   weatherCard?: WeatherCardData;
+  weatherCardCompleted?: boolean; // WeatherCard 완료 상태 추적
 }
 
 interface WeatherChatModalProps {
@@ -67,8 +69,9 @@ const WeatherChatModal: React.FC<WeatherChatModalProps> = ({ isOpen, onClose, we
     scrollToBottom();
   }, [messages]);
   
+  // 모달이 열릴 때마다 새로운 채팅 세션 시작
   useEffect(() => {
-    if (isOpen && !chat) {
+    if (isOpen) {
         const systemInstruction = `You are '제주실시간날씨전용챗봇', a specialized AI assistant for providing real-time weather information for Jeju Island based on a list of live YouTube streams.
 - Your answers MUST be in Korean.
 - Your primary function is to answer questions about the current weather at specific locations in Jeju.
@@ -97,8 +100,14 @@ const WeatherChatModal: React.FC<WeatherChatModalProps> = ({ isOpen, onClose, we
         setMessages([
             { role: 'ai', content: '안녕하세요! 제주 실시간 날씨 챗봇입니다. 알고 싶은 지역의 날씨를 물어보세요. (예: 한라산 날씨 어때?)' }
         ]);
+    } else {
+        // 모달이 닫힐 때 채팅 세션 초기화
+        setChat(null);
+        setMessages([]);
+        setInputValue('');
+        setIsLoading(false);
     }
-  }, [isOpen, chat]);
+  }, [isOpen]);
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading || !chat) return;
@@ -154,19 +163,43 @@ ${currentInput}
                         setMessages(prev => {
                             const updatedMessages = [...prev];
                             updatedMessages[updatedMessages.length - 1] = { role: 'ai', content: responseText };
-                            
+
                             const weatherCardData: WeatherCardData = {
                                 status: 'analyzing',
                                 sourceTitle: source.title,
-                                imageUrl: 'https://i.imgur.com/gT3gA2t.png',
+                                imageUrl: 'https://i.imgur.com/gT3gA2t.png', // 임시, 실제 캡처 후 교체
                                 weatherData: {
-                                    temp: '15°C',
-                                    humidity: '60%',
-                                    wind: '3m/s'
+                                    temp: '분석중...',
+                                    humidity: '분석중...',
+                                    wind: '분석중...'
                                 }
                             };
                             updatedMessages.push({ role: 'ai', content: '', weatherCard: weatherCardData });
                             return updatedMessages;
+                        });
+
+                        // 백그라운드에서 실제 YouTube 캡처 시작
+                        captureWeatherScene(source.youtubeUrl, source.title).then(captureResult => {
+                            if (captureResult) {
+                                // 캡처 완료 후 WeatherCard 데이터 업데이트
+                                setMessages(prev => {
+                                    const updated = [...prev];
+                                    const cardMessage = updated[updated.length - 1];
+                                    if (cardMessage.weatherCard) {
+                                        cardMessage.weatherCard.imageUrl = captureResult.imageUrl;
+                                        cardMessage.weatherCard.weatherData = {
+                                            temp: captureResult.weatherData ? `${captureResult.weatherData.temperature}°C` : '정보없음',
+                                            humidity: captureResult.weatherData ? `${captureResult.weatherData.humidity}%` : '정보없음',
+                                            wind: captureResult.weatherData ? `${captureResult.weatherData.windSpeed}m/s ${captureResult.weatherData.windDirection}` : '정보없음',
+                                            weather: captureResult.weatherData ? captureResult.weatherData.weather : '정보없음',
+                                            location: captureResult.weatherData ? captureResult.weatherData.location : '정보없음'
+                                        };
+                                    }
+                                    return updated;
+                                });
+                            }
+                        }).catch(error => {
+                            console.error('YouTube 캡처 실패:', error);
                         });
                     }
                 }
@@ -192,21 +225,66 @@ ${currentInput}
     }
   };
 
-  const handleWeatherCardComplete = async (source: WeatherCardData) => {
+  const handleWeatherCardComplete = async (source: WeatherCardData, messageIndex: number) => {
+    // 이미 완료된 WeatherCard라면 재실행하지 않음
+    const message = messages[messageIndex];
+    if (message?.weatherCardCompleted) {
+      return;
+    }
+
+    // 메시지를 완료 상태로 마킹
+    setMessages(prev => {
+      const newMessages = [...prev];
+      if (newMessages[messageIndex]) {
+        newMessages[messageIndex].weatherCardCompleted = true;
+      }
+      return newMessages;
+    });
+
     setIsLoading(true);
     setMessages(prev => [...prev, { role: 'ai', content: '' }]);
 
     try {
         const imagePart = await urlToGenerativePart(source.imageUrl);
+
+        // 기상 데이터 정보를 텍스트로 준비
+        const weatherInfo = source.weatherData ? `
+실시간 기상청 관측 데이터:
+- 현재 기온: ${source.weatherData.temp}
+- 습도: ${source.weatherData.humidity}
+- 풍속: ${source.weatherData.wind}
+
+이 데이터는 기상청 공식 관측소에서 제공하는 정확한 수치입니다.
+        ` : '기상청 데이터를 가져올 수 없었습니다.';
+
         const textPart = {
-            text: `당신은 제주도 전문 기상 캐스터입니다. 이 CCTV 이미지는 '${source.sourceTitle}' 지역의 실시간 영상입니다. 이미지를 보고 현재 날씨(하늘 상태, 구름, 안개, 비/눈 여부 등)를 상세하고 생생하게 브리핑해주세요.`
+            text: `당신은 제주도 전문 기상 캐스터입니다. 간결하고 명확한 브리핑을 제공해주세요.
+
+현재 분석 자료:
+📍 ${source.sourceTitle} 실시간 영상
+${weatherInfo}
+
+다음 형식으로 간결하게 브리핑해주세요:
+
+🌤️ **현재 날씨 상황**
+- 하늘 상태와 구름량을 한 문장으로
+- 가시거리나 특이사항이 있다면 간단히
+
+📊 **기상 데이터**
+- 현재 기온의 특징 (평년 대비, 체감온도 등)
+- 습도와 바람의 현재 상태
+
+💡 **외출 팁**
+- 현재 날씨에 맞는 복장이나 주의사항을 1-2줄로
+
+총 5-6줄 이내로 간결하게 작성해주세요.`
         };
 
         const response = await ai.models.generateContentStream({
             model: 'gemini-2.5-flash',
             contents: { parts: [imagePart, textPart] },
         });
-        
+
         let fullResponseText = '';
         for await (const chunk of response) {
             fullResponseText += chunk.text;
@@ -280,9 +358,9 @@ ${currentInput}
                         const showTypingIndicator = isLoading && isLastAIMessage && !msg.content && !msg.weatherCard;
                         return (
                             <div className="flex items-end gap-2 justify-start">
-                                <div className="max-w-xs md:max-w-sm w-full">
+                                <div className="max-w-md md:max-w-lg w-full">
                                     {msg.content ? (
-                                        <div className="px-4 py-2 rounded-2xl break-words bg-white text-gray-800 border rounded-bl-none mb-2">
+                                        <div className="px-4 py-3 rounded-2xl whitespace-pre-wrap break-words bg-white text-gray-800 border rounded-bl-none mb-2 leading-relaxed">
                                             {msg.content}
                                         </div>
                                     ) : showTypingIndicator ? (
@@ -294,7 +372,7 @@ ${currentInput}
                                             </div>
                                         </div>
                                     ) : null}
-                                    {msg.weatherCard && <WeatherCard initialData={msg.weatherCard} onComplete={() => handleWeatherCardComplete(msg.weatherCard!)} />}
+                                    {msg.weatherCard && <WeatherCard initialData={msg.weatherCard} onComplete={() => handleWeatherCardComplete(msg.weatherCard!, index)} skipAnimation={msg.weatherCardCompleted || false} />}
                                 </div>
                             </div>
                         );
