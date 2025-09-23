@@ -39,23 +39,40 @@ const KakaoMapView: React.FC<KakaoMapViewProps> = ({ spots, onSpotClick, height 
     // 카카오맵 API 스크립트 동적 로드
     const script = document.createElement('script');
     script.async = true;
-    // TODO: 실제 카카오맵 API 키로 교체 필요
-    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=KAKAO_API_KEY&autoload=false`;
+    const apiKey = import.meta.env.VITE_KAKAO_API_KEY;
+    console.log('환경변수에서 가져온 API 키:', apiKey);
+
+    if (!apiKey) {
+      console.error('VITE_KAKAO_API_KEY가 정의되지 않았습니다');
+      renderStaticMap();
+      return;
+    }
+
+    // 임시 테스트: 하드코딩된 키 사용
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=cfaab5b99784067ec6b1de9cd3f33be6&autoload=false`;
+    console.log('카카오맵 스크립트 URL:', script.src);
     document.head.appendChild(script);
 
     script.onload = () => {
+      console.log('카카오맵 스크립트 로드 완료');
+      console.log('window.kakao:', window.kakao);
+      console.log('API 키:', import.meta.env.VITE_KAKAO_API_KEY);
+      console.log('전체 환경변수:', import.meta.env);
+
       if (window.kakao?.maps) {
+        console.log('카카오맵 API 사용 가능, 지도 초기화 시작');
         window.kakao.maps.load(() => {
+          console.log('카카오맵 라이브러리 로드 완료');
           initializeMap();
         });
       } else {
-        // API 키가 없을 때 폴백
+        console.error('카카오맵 API를 사용할 수 없습니다. 폴백 지도 표시');
         renderStaticMap();
       }
     };
 
-    script.onerror = () => {
-      // 카카오맵 로드 실패 시 폴백
+    script.onerror = (error) => {
+      console.error('카카오맵 스크립트 로드 실패:', error);
       renderStaticMap();
     };
 

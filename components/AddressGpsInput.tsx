@@ -33,7 +33,7 @@ const AddressGpsInput: React.FC<AddressGpsInputProps> = ({
     if (!window.kakao) {
       const script = document.createElement('script');
       script.async = true;
-      script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=KAKAO_API_KEY&autoload=false&libraries=services`;
+      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${import.meta.env.VITE_KAKAO_API_KEY}&autoload=false&libraries=services`;
       document.head.appendChild(script);
 
       script.onload = () => {

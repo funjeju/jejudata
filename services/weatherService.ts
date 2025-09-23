@@ -1,5 +1,5 @@
 // 기상청 단기예보 API 서비스 (초단기실황)
-const API_KEY = '6wX0LXOM6dnJzLUeQF6TmxE9Bu%2BJw3UXWgYkOHWoSEJsO%2FFcRp%2BxYLFNqba%2B8sef1xssgIFEasCw9HcZS0JO3w%3D%3D';
+const API_KEY = '6wX0LXOM6dnJzLUeQF6Tmxu+Jw3UXWgYkOHWoSEJsO/FcRp+xYLFNqba+8sef1xssgIFEasCw9HcZS0JO3w==';
 
 // 초단기실황 API URL
 const CURRENT_WEATHER_URL = 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst';

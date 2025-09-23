@@ -168,6 +168,7 @@ ${currentInput}
                                 status: 'analyzing',
                                 sourceTitle: source.title,
                                 imageUrl: 'https://i.imgur.com/gT3gA2t.png', // 임시, 실제 캡처 후 교체
+                                youtubeUrl: source.youtubeUrl, // 유튜브 URL 추가
                                 weatherData: {
                                     temp: '분석중...',
                                     humidity: '분석중...',

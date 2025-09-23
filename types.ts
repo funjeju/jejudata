@@ -115,6 +115,7 @@ export interface WeatherCardData {
   status: 'analyzing' | 'capturing' | 'overlaying' | 'done';
   sourceTitle: string;
   imageUrl: string;
+  youtubeUrl?: string; // 유튜브 영상 URL 추가
   // Dummy weather data for simulation
   weatherData: {
     temp: string;
