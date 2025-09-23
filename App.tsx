@@ -704,8 +704,8 @@ const App: React.FC = () => {
             <ChatbotIcon className="h-8 w-8" />
         </button>
 
-        <Chatbot 
-            isOpen={isChatbotOpen} 
+        <Chatbot
+            isOpen={isChatbotOpen}
             onClose={() => setIsChatbotOpen(false)}
             spots={spots}
             onNavigateToSpot={handleNavigateFromChatbot}

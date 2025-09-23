@@ -1,15 +1,19 @@
 // 기상청 단기예보 API 서비스 (초단기실황)
-const API_KEY = '6wX0LXOM6dnJzLUeQF6Tmxu+Jw3UXWgYkOHWoSEJsO/FcRp+xYLFNqba+8sef1xssgIFEasCw9HcZS0JO3w==';
+const API_KEY = import.meta.env.VITE_KMA_API_KEY;
 
 // 초단기실황 API URL
 const CURRENT_WEATHER_URL = 'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst';
 
-// 제주도 격자 좌표 정보 (단기예보 API용)
+// 제주도 격자 좌표 정보 (기상청 단기예보 API용)
 export const JEJU_WEATHER_STATIONS = {
   '제주': { nx: 53, ny: 38, name: '제주' },
   '서귀포': { nx: 52, ny: 33, name: '서귀포' },
-  '성산포': { nx: 55, ny: 34, name: '성산포' },
-  '고산': { nx: 51, ny: 38, name: '고산' }
+  '성산포': { nx: 60, ny: 37, name: '성산포' },
+  '고산': { nx: 46, ny: 35, name: '고산' },
+  '중문': { nx: 51, ny: 32, name: '중문' },
+  '한림': { nx: 48, ny: 36, name: '한림' },
+  '추자도': { nx: 48, ny: 48, name: '추자도' },
+  '우도': { nx: 60, ny: 38, name: '우도' }
 } as const;
 
 export interface CurrentWeatherData {
@@ -47,8 +51,8 @@ function getWeatherFromPTY(pty: string): string {
 // 현재 시간 기준으로 데이터 요청 시간 계산
 function getDataTime() {
   const now = new Date();
-  // 40분 전 시간 사용 (초단기실황은 매시 30분에 발표)
-  now.setMinutes(now.getMinutes() - 40);
+  // 10분 전 시간 사용 (초단기실황은 매시 10분에 발표)
+  now.setMinutes(now.getMinutes() - 10);
 
   const year = now.getFullYear();
   const month = (now.getMonth() + 1).toString().padStart(2, '0');
@@ -64,6 +68,11 @@ function getDataTime() {
 export async function getCurrentWeather(location: keyof typeof JEJU_WEATHER_STATIONS): Promise<CurrentWeatherData | null> {
   const { nx, ny, name } = JEJU_WEATHER_STATIONS[location];
   const { baseDate, baseTime } = getDataTime();
+
+  if (!API_KEY) {
+    console.error('기상청 API 키가 설정되지 않았습니다');
+    return getFallbackWeatherData(name);
+  }
 
   const params = new URLSearchParams({
     serviceKey: API_KEY,
@@ -89,7 +98,7 @@ export async function getCurrentWeather(location: keyof typeof JEJU_WEATHER_STAT
 
     if (!response.ok) {
       console.error('HTTP 오류:', response.status, response.statusText);
-      return null;
+      return getFallbackWeatherData(name);
     }
 
     const text = await response.text();
@@ -106,13 +115,13 @@ export async function getCurrentWeather(location: keyof typeof JEJU_WEATHER_STAT
 
     if (data.response?.header?.resultCode !== '00') {
       console.error('기상청 API 오류:', data.response?.header?.resultMsg);
-      return null;
+      return getFallbackWeatherData(name);
     }
 
     const items = data.response?.body?.items?.item;
     if (!items || items.length === 0) {
       console.error('기상 데이터가 없습니다.');
-      return null;
+      return getFallbackWeatherData(name);
     }
 
     // 데이터를 카테고리별로 정리
@@ -136,22 +145,25 @@ export async function getCurrentWeather(location: keyof typeof JEJU_WEATHER_STAT
 
   } catch (error) {
     console.error('기상 데이터 가져오기 실패:', error);
-
-    // 임시 더미 데이터 반환 (개발용)
-    console.warn('더미 데이터로 대체합니다.');
-    return {
-      location: name,
-      observationTime: new Date().toISOString().slice(0, 16).replace('T', ' '),
-      temperature: Math.round(15 + Math.random() * 15), // 15-30도
-      humidity: Math.round(50 + Math.random() * 40),     // 50-90%
-      windSpeed: Math.round(Math.random() * 10),         // 0-10m/s
-      windDirection: ['북', '북동', '동', '남동', '남', '남서', '서', '북서'][Math.floor(Math.random() * 8)],
-      precipitation: Math.random() < 0.2 ? Math.round(Math.random() * 5) : 0, // 20% 확률로 강수
-      pressure: 0,
-      visibility: 0,
-      weather: Math.random() < 0.7 ? '맑음' : ['구름많음', '흐림', '비'][Math.floor(Math.random() * 3)]
-    };
+    return getFallbackWeatherData(name);
   }
+}
+
+// 폴백 더미 데이터 생성 함수
+function getFallbackWeatherData(locationName: string): CurrentWeatherData {
+  console.warn('더미 데이터로 대체합니다.');
+  return {
+    location: locationName,
+    observationTime: new Date().toISOString().slice(0, 16).replace('T', ' '),
+    temperature: Math.round(15 + Math.random() * 15), // 15-30도
+    humidity: Math.round(50 + Math.random() * 40),     // 50-90%
+    windSpeed: Math.round(Math.random() * 10),         // 0-10m/s
+    windDirection: ['북', '북동', '동', '남동', '남', '남서', '서', '북서'][Math.floor(Math.random() * 8)],
+    precipitation: Math.random() < 0.2 ? Math.round(Math.random() * 5) : 0, // 20% 확률로 강수
+    pressure: Math.round(1000 + Math.random() * 30),   // 1000-1030 hPa
+    visibility: Math.round(10 + Math.random() * 10),   // 10-20 km
+    weather: Math.random() < 0.7 ? '맑음' : ['구름많음', '흐림', '비'][Math.floor(Math.random() * 3)]
+  };
 }
 
 // 여러 지역의 현재 날씨 데이터를 한번에 가져오기

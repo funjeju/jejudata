@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import type { Place } from '../types';
 
-interface KakaoMapViewProps {
+interface GoogleMapViewProps {
   spots: Place[];
   onSpotClick?: (spot: Place) => void;
   height?: string;
@@ -26,53 +26,50 @@ const getCategoryColor = (category?: string): string => {
 
 declare global {
   interface Window {
-    kakao: any;
+    google: any;
+    initGoogleMap: () => void;
   }
 }
 
-const KakaoMapView: React.FC<KakaoMapViewProps> = ({ spots, onSpotClick, height = '400px' }) => {
+const GoogleMapView: React.FC<GoogleMapViewProps> = ({ spots, onSpotClick, height = '400px' }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
 
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_KAKAO_API_KEY;
-    console.log('환경변수에서 가져온 API 키:', apiKey);
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+    console.log('Google Maps API 키:', apiKey);
 
     if (!apiKey) {
-      console.error('VITE_KAKAO_API_KEY가 정의되지 않았습니다');
+      console.error('VITE_GOOGLE_MAPS_API_KEY가 정의되지 않았습니다');
       renderStaticMap();
       return;
     }
 
-    // 이미 카카오맵 스크립트가 로드되어 있는지 확인
-    if (window.kakao?.maps) {
-      console.log('카카오맵 API가 이미 로드되어 있음');
-      window.kakao.maps.load(() => {
-        initializeMap();
-      });
+    // 이미 Google Maps API가 로드되어 있는지 확인
+    if (window.google?.maps) {
+      console.log('Google Maps API가 이미 로드되어 있음');
+      initializeMap();
       return;
     }
 
     // 스크립트가 이미 존재하는지 확인
-    const existingScript = document.querySelector('script[src*="dapi.kakao.com"]');
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
     if (existingScript) {
-      console.log('카카오맵 스크립트가 이미 DOM에 있음');
+      console.log('Google Maps 스크립트가 이미 DOM에 있음');
       // 스크립트가 로드될 때까지 기다림
       const checkInterval = setInterval(() => {
-        if (window.kakao?.maps) {
+        if (window.google?.maps) {
           clearInterval(checkInterval);
-          window.kakao.maps.load(() => {
-            initializeMap();
-          });
+          initializeMap();
         }
       }, 100);
 
       // 10초 후 타임아웃
       setTimeout(() => {
         clearInterval(checkInterval);
-        if (!window.kakao?.maps) {
-          console.error('카카오맵 로드 타임아웃');
+        if (!window.google?.maps) {
+          console.error('Google Maps 로드 타임아웃');
           renderStaticMap();
         }
       }, 10000);
@@ -82,25 +79,22 @@ const KakaoMapView: React.FC<KakaoMapViewProps> = ({ spots, onSpotClick, height 
     // 새 스크립트 생성 및 로드
     const script = document.createElement('script');
     script.async = true;
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${apiKey}&autoload=false`;
-    console.log('카카오맵 스크립트 URL:', script.src);
+    script.defer = true;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
+    console.log('Google Maps 스크립트 URL:', script.src);
 
     script.onload = () => {
-      console.log('카카오맵 스크립트 로드 완료');
-      if (window.kakao?.maps) {
-        console.log('카카오맵 API 사용 가능, 지도 초기화 시작');
-        window.kakao.maps.load(() => {
-          console.log('카카오맵 라이브러리 로드 완료');
-          initializeMap();
-        });
+      console.log('Google Maps API 로드 완료');
+      if (window.google?.maps) {
+        initializeMap();
       } else {
-        console.error('카카오맵 API를 사용할 수 없습니다. 폴백 지도 표시');
+        console.error('Google Maps API를 사용할 수 없습니다');
         renderStaticMap();
       }
     };
 
     script.onerror = (error) => {
-      console.error('카카오맵 스크립트 로드 실패:', error);
+      console.error('Google Maps 스크립트 로드 실패:', error);
       renderStaticMap();
     };
 
@@ -217,24 +211,25 @@ const KakaoMapView: React.FC<KakaoMapViewProps> = ({ spots, onSpotClick, height 
   };
 
   const initializeMap = () => {
-    if (!mapContainer.current || !window.kakao?.maps) return;
+    if (!mapContainer.current || !window.google?.maps) return;
 
     const centerLat = spots.length > 0 && spots[0].location?.latitude ? spots[0].location.latitude : 33.499621;
     const centerLng = spots.length > 0 && spots[0].location?.longitude ? spots[0].location.longitude : 126.531188;
 
     const mapOptions = {
-      center: new window.kakao.maps.LatLng(centerLat, centerLng),
-      level: 9
+      center: { lat: centerLat, lng: centerLng },
+      zoom: 10,
+      mapTypeId: window.google.maps.MapTypeId.ROADMAP,
     };
 
-    const newMap = new window.kakao.maps.Map(mapContainer.current, mapOptions);
+    const newMap = new window.google.maps.Map(mapContainer.current, mapOptions);
     mapRef.current = newMap;
 
     updateMarkers();
   };
 
   const updateMarkers = () => {
-    if (!mapRef.current || !window.kakao?.maps) return;
+    if (!mapRef.current || !window.google?.maps) return;
 
     // 기존 마커들 제거
     markersRef.current.forEach(marker => marker.setMap(null));
@@ -244,24 +239,45 @@ const KakaoMapView: React.FC<KakaoMapViewProps> = ({ spots, onSpotClick, height 
     spots.forEach(spot => {
       if (!spot.location?.latitude || !spot.location?.longitude) return;
 
-      const position = new window.kakao.maps.LatLng(spot.location.latitude, spot.location.longitude);
-      const marker = new window.kakao.maps.Marker({
+      const position = { lat: spot.location.latitude, lng: spot.location.longitude };
+      const marker = new window.google.maps.Marker({
         position: position,
-        title: spot.place_name
+        map: mapRef.current,
+        title: spot.place_name,
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          fillColor: getCategoryColor(spot.categories?.[0]),
+          fillOpacity: 1,
+          strokeColor: 'white',
+          strokeWeight: 2,
+          scale: 8,
+        },
       });
 
-      marker.setMap(mapRef.current);
       markersRef.current.push(marker);
 
       // 마커 클릭 이벤트
       if (onSpotClick) {
-        window.kakao.maps.event.addListener(marker, 'click', () => {
+        marker.addListener('click', () => {
           onSpotClick(spot);
         });
       }
+
+      // 정보창 추가
+      const infoWindow = new window.google.maps.InfoWindow({
+        content: `
+          <div class="p-2">
+            <h3 class="font-semibold text-sm">${spot.place_name}</h3>
+            <p class="text-xs text-gray-600">${spot.categories?.join(', ') || '기타'}</p>
+          </div>
+        `,
+      });
+
+      marker.addListener('click', () => {
+        infoWindow.open(mapRef.current, marker);
+      });
     });
   };
-
 
   return (
     <div className="w-full" style={{ height }}>
@@ -270,4 +286,4 @@ const KakaoMapView: React.FC<KakaoMapViewProps> = ({ spots, onSpotClick, height 
   );
 };
 
-export default KakaoMapView;
+export default GoogleMapView;

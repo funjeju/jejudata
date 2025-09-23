@@ -12,7 +12,8 @@ interface AddressGpsInputProps {
 
 declare global {
   interface Window {
-    kakao: any;
+    google: any;
+    initGoogleMapsForAddress: () => void;
   }
 }
 
@@ -29,19 +30,34 @@ const AddressGpsInput: React.FC<AddressGpsInputProps> = ({
   const [isMapVisible, setIsMapVisible] = useState(false);
 
   useEffect(() => {
-    // 카카오맵 API 스크립트 로드
-    if (!window.kakao) {
-      const script = document.createElement('script');
-      script.async = true;
-      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${import.meta.env.VITE_KAKAO_API_KEY}&autoload=false&libraries=services`;
-      document.head.appendChild(script);
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
-      script.onload = () => {
-        window.kakao.maps.load(() => {
-          // API 로드 완료
-        });
-      };
+    if (!apiKey) {
+      console.error('VITE_GOOGLE_MAPS_API_KEY가 정의되지 않았습니다');
+      return;
     }
+
+    // 이미 Google Maps API가 로드되어 있는지 확인
+    if (window.google?.maps) {
+      return;
+    }
+
+    // 스크립트가 이미 존재하는지 확인
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+    if (existingScript) {
+      return;
+    }
+
+    // 새 스크립트 생성 및 로드
+    const script = document.createElement('script');
+    script.async = true;
+    script.defer = true;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=geometry,places`;
+
+    script.onload = () => {
+      console.log('Google Maps API for Address 로드 완료');
+    };
+    document.head.appendChild(script);
   }, []);
 
   useEffect(() => {
@@ -51,25 +67,25 @@ const AddressGpsInput: React.FC<AddressGpsInputProps> = ({
   }, [map, location]);
 
   const initializeMap = (container: HTMLDivElement) => {
-    if (!window.kakao?.maps) return;
+    if (!window.google?.maps) return;
 
     const centerLat = location?.latitude || 33.499621;
     const centerLng = location?.longitude || 126.531188;
 
     const mapOptions = {
-      center: new window.kakao.maps.LatLng(centerLat, centerLng),
-      level: location ? 5 : 9
+      center: { lat: centerLat, lng: centerLng },
+      zoom: location ? 15 : 10,
+      mapTypeId: window.google.maps.MapTypeId.ROADMAP,
     };
 
-    const newMap = new window.kakao.maps.Map(container, mapOptions);
+    const newMap = new window.google.maps.Map(container, mapOptions);
     setMap(newMap);
 
     // 지도 클릭 이벤트
-    window.kakao.maps.event.addListener(newMap, 'click', (mouseEvent: any) => {
-      const latlng = mouseEvent.latLng;
+    newMap.addListener('click', (event: any) => {
       const newLocation: Geopoint = {
-        latitude: latlng.getLat(),
-        longitude: latlng.getLng()
+        latitude: event.latLng.lat(),
+        longitude: event.latLng.lng()
       };
 
       onLocationChange(newLocation);
@@ -85,39 +101,44 @@ const AddressGpsInput: React.FC<AddressGpsInputProps> = ({
   };
 
   const updateMapMarker = (geopoint: Geopoint) => {
-    if (!map || !window.kakao?.maps) return;
+    if (!map || !window.google?.maps) return;
 
-    const position = new window.kakao.maps.LatLng(geopoint.latitude, geopoint.longitude);
+    const position = { lat: geopoint.latitude, lng: geopoint.longitude };
 
     if (marker) {
       marker.setMap(null);
     }
 
-    const newMarker = new window.kakao.maps.Marker({
-      position: position
+    const newMarker = new window.google.maps.Marker({
+      position: position,
+      map: map,
     });
 
-    newMarker.setMap(map);
     setMarker(newMarker);
     map.setCenter(position);
   };
 
   const searchAddressToCoords = async () => {
-    if (!address.trim() || !window.kakao?.maps?.services) {
+    if (!address.trim()) {
       alert('주소를 입력해주세요.');
+      return;
+    }
+
+    if (!window.google?.maps) {
+      alert('Google Maps API가 로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
       return;
     }
 
     setIsLoading(true);
 
-    const geocoder = new window.kakao.maps.services.Geocoder();
+    const geocoder = new window.google.maps.Geocoder();
 
-    geocoder.addressSearch(address, (result: any, status: any) => {
-      if (status === window.kakao.maps.services.Status.OK) {
-        const coords = result[0];
+    geocoder.geocode({ address: address }, (results: any, status: any) => {
+      if (status === 'OK' && results[0]) {
+        const location = results[0].geometry.location;
         const newLocation: Geopoint = {
-          latitude: parseFloat(coords.y),
-          longitude: parseFloat(coords.x)
+          latitude: location.lat(),
+          longitude: location.lng()
         };
 
         onLocationChange(newLocation);
@@ -135,15 +156,14 @@ const AddressGpsInput: React.FC<AddressGpsInputProps> = ({
   };
 
   const convertCoordsToAddress = (geopoint: Geopoint) => {
-    if (!window.kakao?.maps?.services) return;
+    if (!window.google?.maps) return;
 
-    const geocoder = new window.kakao.maps.services.Geocoder();
-    const coord = new window.kakao.maps.LatLng(geopoint.latitude, geopoint.longitude);
+    const geocoder = new window.google.maps.Geocoder();
+    const latlng = { lat: geopoint.latitude, lng: geopoint.longitude };
 
-    geocoder.coord2Address(coord.getLng(), coord.getLat(), (result: any, status: any) => {
-      if (status === window.kakao.maps.services.Status.OK) {
-        const detailAddr = result[0].road_address ? result[0].road_address.address_name : result[0].address.address_name;
-        onAddressChange(detailAddr);
+    geocoder.geocode({ location: latlng }, (results: any, status: any) => {
+      if (status === 'OK' && results[0]) {
+        onAddressChange(results[0].formatted_address);
       }
     });
   };
@@ -155,7 +175,7 @@ const AddressGpsInput: React.FC<AddressGpsInputProps> = ({
     if (!isMapVisible) {
       setTimeout(() => {
         const container = document.getElementById('address-map');
-        if (container && window.kakao?.maps) {
+        if (container && window.google?.maps) {
           initializeMap(container as HTMLDivElement);
         }
       }, 100);

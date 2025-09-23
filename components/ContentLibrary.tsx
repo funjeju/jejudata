@@ -6,7 +6,7 @@ import Button from './common/Button';
 import Card from './common/Card';
 import Input from './common/Input';
 import ExportModal from './ExportModal';
-import KakaoMapView from './KakaoMapView';
+import GoogleMapView from './GoogleMapView';
 
 interface ContentLibraryProps {
   spots: Place[];
@@ -195,7 +195,7 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
       {/* 뷰 모드에 따른 조건부 렌더링 */}
       {viewMode === 'map' ? (
         <div className="mb-6">
-          <KakaoMapView
+          <GoogleMapView
             spots={filteredAndSortedSpots}
             onSpotClick={onView}
             height="500px"

@@ -76,6 +76,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
                       ]
                     }
                     \`\`\`
+
+                    - When users ask about weather information, politely explain that you only provide information about registered travel spots and suggest they use the weather chatbot for weather-related queries.
                 `
             }
         });
@@ -135,6 +137,8 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
         if (jsonMatch && jsonMatch[1]) {
             try {
                 const parsedJson = JSON.parse(jsonMatch[1]);
+
+                // 기존 recommendations 처리
                 if (parsedJson.recommendations) {
                     const introText = fullResponseText.substring(0, jsonMatch.index).trim();
                     setMessages(prev => {

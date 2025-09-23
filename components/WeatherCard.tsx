@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { WeatherCardData } from '../types';
 import Spinner from './common/Spinner';
 import Modal from './common/Modal';
+import Hls from 'hls.js';
 
 interface WeatherCardProps {
   initialData: WeatherCardData;
@@ -73,11 +74,86 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialData, onComplete, skip
     );
   }
 
+  // 영상 타입 감지 함수
+  const getVideoType = (url: string): 'youtube' | 'hls' | 'unknown' => {
+    try {
+      const urlObj = new URL(url);
+      if (urlObj.hostname === 'www.youtube.com' || urlObj.hostname === 'youtube.com' || urlObj.hostname === 'youtu.be') {
+        return 'youtube';
+      } else if (url.includes('.m3u8') || url.includes('playlist.m3u8')) {
+        return 'hls';
+      }
+      return 'unknown';
+    } catch (error) {
+      return 'unknown';
+    }
+  };
+
   // 유튜브 영상 ID 추출 함수
   const getYouTubeVideoId = (url: string): string | null => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[2].length === 11) ? match[2] : null;
+  };
+
+  // HLS Video Component
+  const HLSVideo: React.FC<{ src: string; title: string }> = ({ src, title }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const hlsRef = useRef<Hls | null>(null);
+
+    useEffect(() => {
+      const video = videoRef.current;
+      if (!video) return;
+
+      // Cleanup previous HLS instance
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
+
+      if (Hls.isSupported()) {
+        // Use HLS.js for browsers that don't support HLS natively
+        const hls = new Hls();
+        hls.loadSource(src);
+        hls.attachMedia(video);
+        hlsRef.current = hls;
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log('HLS manifest parsed, starting playback');
+          video.play().catch(console.error);
+        });
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error('HLS error:', data);
+        });
+
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // For Safari which supports HLS natively
+        video.src = src;
+        video.addEventListener('loadedmetadata', () => {
+          video.play().catch(console.error);
+        });
+      } else {
+        console.error('HLS is not supported in this browser');
+      }
+
+      return () => {
+        if (hlsRef.current) {
+          hlsRef.current.destroy();
+          hlsRef.current = null;
+        }
+      };
+    }, [src]);
+
+    return (
+      <video
+        ref={videoRef}
+        controls
+        muted
+        className="w-full h-full"
+        title={title}
+      />
+    );
   };
 
   const handlePlayVideo = () => {
@@ -105,7 +181,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialData, onComplete, skip
                   <button
                     onClick={handlePlayVideo}
                     className="bg-red-600 bg-opacity-50 hover:bg-opacity-70 text-white rounded-full p-6 shadow-xl transition-all duration-200 transform hover:scale-110"
-                    title="유튜브 영상 재생"
+                    title="실시간 영상 재생"
                   >
                     <svg className="w-12 h-12 ml-1" fill="currentColor" viewBox="0 0 24 24">
                       <path d="M8 5v14l11-7z"/>
@@ -181,30 +257,57 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialData, onComplete, skip
       >
         <div className="max-w-4xl mx-auto">
           {initialData.youtubeUrl && (() => {
-            const videoId = getYouTubeVideoId(initialData.youtubeUrl);
-            return videoId ? (
-              <div className="relative aspect-video">
-                <iframe
-                  src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1`}
-                  title={`${initialData.sourceTitle} YouTube Live Stream`}
-                  className="w-full h-full rounded-lg"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                />
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-600">유효하지 않은 유튜브 URL입니다.</p>
-                <a
-                  href={initialData.youtubeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:underline mt-2 inline-block"
-                >
-                  유튜브에서 직접 보기 →
-                </a>
-              </div>
-            );
+            const videoType = getVideoType(initialData.youtubeUrl);
+
+            if (videoType === 'youtube') {
+              const videoId = getYouTubeVideoId(initialData.youtubeUrl);
+              return videoId ? (
+                <div className="relative aspect-video">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1`}
+                    title={`${initialData.sourceTitle} YouTube Live Stream`}
+                    className="w-full h-full rounded-lg"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">유효하지 않은 YouTube URL입니다.</p>
+                  <a
+                    href={initialData.youtubeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline mt-2 inline-block"
+                  >
+                    원본 영상에서 보기 →
+                  </a>
+                </div>
+              );
+            } else if (videoType === 'hls') {
+              return (
+                <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                  <HLSVideo
+                    src={initialData.youtubeUrl}
+                    title={initialData.sourceTitle}
+                  />
+                </div>
+              );
+            } else {
+              return (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">지원되지 않는 영상 형식입니다.</p>
+                  <a
+                    href={initialData.youtubeUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-500 hover:underline mt-2 inline-block"
+                  >
+                    원본 영상에서 보기 →
+                  </a>
+                </div>
+              );
+            }
           })()}
 
           <div className="mt-4 p-4 bg-gray-50 rounded-lg">
@@ -224,7 +327,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialData, onComplete, skip
               </div>
             </div>
 
-            {/* 유튜브에서 보기 링크 */}
+            {/* 원본 영상에서 보기 링크 */}
             <div className="mt-4 text-center">
               <a
                 href={initialData.youtubeUrl}
@@ -235,7 +338,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialData, onComplete, skip
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
                 </svg>
-                유튜브에서 보기
+                원본 영상에서 보기
               </a>
             </div>
           </div>

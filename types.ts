@@ -109,6 +109,10 @@ export interface WeatherSource {
   youtubeUrl: string;
   title: string;
   apiKey: string;
+  direction?: '동' | '서' | '남' | '북' | '중앙';
+  keywords?: string[];
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface WeatherCardData {
