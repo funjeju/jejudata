@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import type { Place, ImageInfo, Comment, LinkedSpot, PublicInfo } from '../types';
+import type { Place, ImageInfo, Comment, LinkedSpot, PublicInfo, Geopoint } from '../types';
+import AddressGpsInput from './AddressGpsInput';
 import {
   TARGET_AUDIENCE_GROUPS,
   RECOMMENDED_SEASONS_GROUPS,
@@ -208,7 +209,13 @@ const ReviewDashboard: React.FC<ReviewDashboardProps> = ({ initialData, onSave, 
                 options={['draft', 'published', 'rejected']} 
               />
               <div className="md:col-span-2">
-                <Input label="주소" value={data.address || ''} onChange={e => handleInputChange('address', e.target.value)} />
+                <label className="block text-sm font-medium text-gray-700 mb-2">주소 및 GPS 좌표</label>
+                <AddressGpsInput
+                  address={data.address || ''}
+                  location={data.location}
+                  onAddressChange={(address) => handleInputChange('address', address)}
+                  onLocationChange={(location) => handleInputChange('location', location)}
+                />
               </div>
                <Input label="평균 체류 시간 (분)" type="number" value={data.average_duration_minutes || ''} onChange={e => handleInputChange('average_duration_minutes', e.target.value ? parseInt(e.target.value, 10) : null)} />
             </div>

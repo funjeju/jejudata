@@ -6,7 +6,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 const Input: React.FC<InputProps> = ({ label, id, ...props }) => {
-  const inputId = id || label.replace(/\s+/g, '-').toLowerCase();
+  const inputId = id || (label || '').replace(/\s+/g, '-').toLowerCase();
   return (
     <div>
       <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 mb-1">

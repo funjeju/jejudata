@@ -6,6 +6,7 @@ import Button from './common/Button';
 import Card from './common/Card';
 import Input from './common/Input';
 import ExportModal from './ExportModal';
+import GoogleMapView from './GoogleMapView';
 
 interface ContentLibraryProps {
   spots: Place[];
@@ -52,6 +53,7 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
   const [regionFilter, setRegionFilter] = useState<string>('all');
   const [sortConfig, setSortConfig] = useState<{ key: keyof Place; direction: 'asc' | 'desc' }>({ key: 'updated_at', direction: 'desc' });
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
 
 
   const filteredAndSortedSpots = useMemo(() => {
@@ -106,10 +108,34 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
 
   return (
     <>
-    <Card>
+      <Card>
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
         <h2 className="text-2xl font-bold text-gray-800">콘텐츠 라이브러리</h2>
         <div className="flex items-center gap-2 flex-wrap justify-end gap-y-2">
+            {/* 지도/리스트 전환 버튼 */}
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                📋 리스트
+              </button>
+              <button
+                onClick={() => setViewMode('map')}
+                className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'map'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🗺️ 지도
+              </button>
+            </div>
+
             <Button
                 onClick={onOpenTripPlanner}
                 className="bg-teal-500 text-white hover:bg-teal-600 focus:ring-teal-400"
@@ -166,8 +192,18 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
          </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
+      {/* 뷰 모드에 따른 조건부 렌더링 */}
+      {viewMode === 'map' ? (
+        <div className="mb-6">
+          <GoogleMapView
+            spots={filteredAndSortedSpots}
+            onSpotClick={onView}
+            height="500px"
+          />
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('place_name')}>스팟 이름 {getSortIcon('place_name')}</th>
@@ -211,15 +247,16 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
             )}
           </tbody>
         </table>
-      </div>
-    </Card>
+        </div>
+      )}
+      </Card>
 
-    <ExportModal
+      <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         allSpots={spots}
         filteredSpots={filteredAndSortedSpots}
-    />
+      />
     </>
   );
 };
