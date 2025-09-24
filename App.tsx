@@ -8,6 +8,7 @@ import SpotDetailView from './components/SpotDetailView';
 import Chatbot from './components/Chatbot';
 import WeatherChatModal from './components/WeatherChatModal';
 import TripPlannerModal from './components/TripPlannerModal';
+import VideoViewer from './components/VideoViewer';
 import Spinner from './components/common/Spinner';
 import Modal from './components/common/Modal';
 import Button from './components/common/Button';
@@ -61,85 +62,51 @@ const App: React.FC = () => {
   const [isTripPlannerOpen, setIsTripPlannerOpen] = useState(false);
   const [weatherSources, setWeatherSources] = useState<WeatherSource[]>([]);
   const [isLoadingSpots, setIsLoadingSpots] = useState(true);
-// 스팟 데이터 불러오기 (임시로 로컬 스토리지 사용)
+// 스팟 데이터 실시간 리스너
   useEffect(() => {
-    const loadSpots = async () => {
-      try {
-        // 먼저 로컬 스토리지에서 데이터 확인
-        const localData = localStorage.getItem('jejuSpots');
-        if (localData) {
-          const spotsArray: Place[] = JSON.parse(localData);
-          setSpots(spotsArray);
-          setIsLoadingSpots(false);
-          console.log(`로컬 스토리지에서 ${spotsArray.length}개의 스팟을 불러왔습니다.`);
-          return;
-        }
+    console.log('Firestore 실시간 리스너 설정 중...');
+    const q = query(collection(db, "spots"));
 
-        // 로컬 데이터가 없으면 Firestore에서 시도
-        console.log('Firestore에서 데이터를 불러오는 중...');
-        const q = query(collection(db, "spots"));
-        const querySnapshot = await getDocs(q);
-        const spotsArray: Place[] = querySnapshot.docs.map((docSnap) =>
-          parsePlaceFromFirestore(docSnap.data(), docSnap.id)
-        );
-        setSpots(spotsArray);
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const spotsArray: Place[] = querySnapshot.docs.map((docSnap) =>
+        parsePlaceFromFirestore(docSnap.data(), docSnap.id)
+      );
+      setSpots(spotsArray);
+      setIsLoadingSpots(false);
+      console.log(`Firestore에서 실시간으로 ${spotsArray.length}개의 스팟을 불러왔습니다.`);
+    }, (error) => {
+      console.error('Error in spots listener:', error);
+      setSpots([]);
+      setIsLoadingSpots(false);
+    });
 
-        // 로컬 스토리지에 저장
-        localStorage.setItem('jejuSpots', JSON.stringify(spotsArray));
-
-        setIsLoadingSpots(false);
-        console.log(`Firestore에서 ${spotsArray.length}개의 스팟을 불러왔습니다.`);
-      } catch (error) {
-        console.error('Error loading spots:', error);
-
-        // Firestore 오류 시 빈 배열로 시작
-        setSpots([]);
-        setIsLoadingSpots(false);
-        console.log('Firestore 연결 실패. 빈 상태로 시작합니다.');
-      }
-    };
-
-    loadSpots();
+    return () => unsubscribe();
   }, []);
 
-  // 날씨 소스 데이터 불러오기 (로컬 스토리지 우선)
+  // 날씨 소스 데이터 실시간 리스너
   useEffect(() => {
-    const loadWeatherSources = async () => {
-      try {
-        // 먼저 로컬 스토리지에서 데이터 확인
-        const localData = localStorage.getItem('jejuWeatherSources');
-        if (localData) {
-          const sourcesArray: WeatherSource[] = JSON.parse(localData);
-          setWeatherSources(sourcesArray);
-          console.log(`로컬 스토리지에서 날씨 소스 ${sourcesArray.length}개를 불러왔습니다.`);
-          return;
-        }
+    console.log('WeatherSources Firestore 실시간 리스너 설정 중...');
+    const q = query(collection(db, "weatherSources"));
 
-        // 로컬 데이터가 없으면 Firestore에서 시도
-        console.log('Firestore에서 날씨 소스를 불러오는 중...');
-        const q = query(collection(db, "weatherSources"));
-        const querySnapshot = await getDocs(q);
-        const sourcesArray: WeatherSource[] = [];
-        querySnapshot.forEach((doc) => {
-          sourcesArray.push(doc.data() as WeatherSource);
-        });
-        setWeatherSources(sourcesArray);
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const sourcesArray: WeatherSource[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data() as WeatherSource;
+        console.log(`Firestore에서 로드된 데이터 (${data.title}):`, data);
+        console.log(`GPS 좌표 - lat: ${data.latitude}, lng: ${data.longitude}`);
+        sourcesArray.push(data);
+      });
+      setWeatherSources(sourcesArray);
+      console.log(`Firestore에서 실시간으로 날씨 소스 ${sourcesArray.length}개를 불러왔습니다.`);
+    }, (error) => {
+      console.error('Error in weatherSources listener:', error);
+      setWeatherSources([]);
+    });
 
-        // 로컬 스토리지에 저장
-        localStorage.setItem('jejuWeatherSources', JSON.stringify(sourcesArray));
-
-        console.log(`Firestore에서 날씨 소스 ${sourcesArray.length}개를 불러왔습니다.`);
-      } catch (error) {
-        console.error('Error loading weather sources:', error);
-
-        // Firestore 오류 시 빈 배열로 시작
-        setWeatherSources([]);
-        console.log('날씨 소스 Firestore 연결 실패. 빈 상태로 시작합니다.');
-      }
-    };
-
-    loadWeatherSources();
+    return () => unsubscribe();
   }, []);
+
+
   const handleGenerateDraft = useCallback(async (formData: InitialFormData) => {
 
     setStep('loading');
@@ -274,6 +241,8 @@ const App: React.FC = () => {
 
         // Firestore에도 백업 저장 시도
         try {
+          console.log('Firestore에 저장할 데이터:', weatherSourceData);
+          console.log('저장할 GPS 좌표:', { lat: weatherSourceData.latitude, lng: weatherSourceData.longitude });
           await setDoc(doc(db, "weatherSources", id), weatherSourceData);
           console.log('날씨 소스 Firestore에 백업 저장 완료');
         } catch (firestoreError) {
@@ -530,6 +499,8 @@ const App: React.FC = () => {
   };
 
   const handleSaveWeatherSource = (data: Omit<WeatherSource, 'id'> & { id?: string }) => {
+      console.log('handleSaveWeatherSource 호출됨:', data);
+      console.log('전달된 GPS 좌표:', { lat: data.latitude, lng: data.longitude });
       handleSaveWeatherSourceToFirebase(data);
   };
 
@@ -555,6 +526,17 @@ const App: React.FC = () => {
       console.log('  - window.captureWeatherScene(url, title): 실제 캡처 실행');
     }
   }, []);
+  // URL 기반 라우팅 확인
+  const checkRoute = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.has('url') && window.location.pathname === '/';
+  };
+
+  // VideoViewer 페이지인지 확인
+  if (checkRoute()) {
+    return <VideoViewer />;
+  }
+
   const renderContent = () => {
     switch (step) {
       case 'library':

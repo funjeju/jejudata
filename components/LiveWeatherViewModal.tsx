@@ -41,6 +41,15 @@ const truncate = (text: string, length: number): string => {
   return text.substring(0, length);
 };
 
+// Helper to convert URLs to use HLS proxy for HTTPS compatibility
+const convertToProxyUrl = (url: string): string => {
+  // 모든 m3u8 URL을 프록시로 처리 (HTTP든 HTTPS든 상관없이)
+  if (url.includes('.m3u8')) {
+    return `https://hls-proxy-server-wjbh.vercel.app/proxy-hls?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+};
+
 // Helper to classify regions
 const getRegion = (title: string): '동쪽' | '서쪽' | '남쪽' | '북쪽' => {
   const eastKeywords = ['성산', '구좌', '우도', '세화', '하도', '종달'];
@@ -80,7 +89,8 @@ const HLSVideo: React.FC<{ src: string; title: string }> = ({ src, title }) => {
     if (Hls.isSupported()) {
       // Use HLS.js for browsers that don't support HLS natively
       const hls = new Hls();
-      hls.loadSource(src);
+      const proxyUrl = convertToProxyUrl(src);
+      hls.loadSource(proxyUrl);
       hls.attachMedia(video);
       hlsRef.current = hls;
 
@@ -95,7 +105,8 @@ const HLSVideo: React.FC<{ src: string; title: string }> = ({ src, title }) => {
 
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       // For Safari which supports HLS natively
-      video.src = src;
+      const proxyUrl = convertToProxyUrl(src);
+      video.src = proxyUrl;
       video.addEventListener('loadedmetadata', () => {
         video.play().catch(console.error);
       });
@@ -203,10 +214,104 @@ const LiveWeatherViewModal: React.FC<LiveWeatherViewModalProps> = ({ isOpen, onC
                       allowFullScreen
                     ></iframe>
                   ) : videoType === 'hls' && activeSource ? (
-                    <HLSVideo
-                      src={activeSource.youtubeUrl}
-                      title={activeSource.title}
-                    />
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white">
+                      <div className="text-center mb-4">
+                        <h3 className="text-lg font-semibold mb-2">{activeSource.title}</h3>
+                        <p className="text-sm text-gray-300 mb-4">
+                          실시간 영상을 새창에서 확인하세요
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          // 새창 열고 HTTP 페이지로 직접 이동
+                          const screenWidth = window.screen.width;
+                          const screenHeight = window.screen.height;
+                          const windowWidth = Math.min(1400, screenWidth * 0.9);
+                          const windowHeight = Math.min(900, screenHeight * 0.9);
+                          const left = (screenWidth - windowWidth) / 2;
+                          const top = (screenHeight - windowHeight) / 2;
+
+                          const newWindow = window.open(
+                            'about:blank',
+                            '_blank',
+                            `width=${windowWidth},height=${windowHeight},left=${left},top=${top},resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no`
+                          );
+
+                          if (newWindow) {
+                            // 새창에 HTML 작성 (닫기 버튼 + HTTP iframe)
+                            newWindow.document.write(`
+                              <!DOCTYPE html>
+                              <html>
+                                <head>
+                                  <title>${activeSource.title}</title>
+                                  <meta charset="utf-8">
+                                  <style>
+                                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                                    body { background: black; overflow: hidden; font-family: Arial, sans-serif; }
+                                    .close-btn {
+                                      position: fixed;
+                                      top: 16px;
+                                      right: 16px;
+                                      z-index: 9999;
+                                      background: rgba(0, 0, 0, 0.8);
+                                      color: white;
+                                      border: none;
+                                      padding: 12px 20px;
+                                      border-radius: 8px;
+                                      cursor: pointer;
+                                      font-size: 16px;
+                                      font-weight: bold;
+                                      backdrop-filter: blur(10px);
+                                      transition: all 0.2s;
+                                    }
+                                    .close-btn:hover {
+                                      background: rgba(220, 38, 38, 0.9);
+                                      transform: scale(1.05);
+                                    }
+                                    .title {
+                                      position: fixed;
+                                      top: 16px;
+                                      left: 16px;
+                                      z-index: 9998;
+                                      background: rgba(0, 0, 0, 0.8);
+                                      color: white;
+                                      padding: 12px 20px;
+                                      border-radius: 8px;
+                                      font-size: 18px;
+                                      font-weight: bold;
+                                      backdrop-filter: blur(10px);
+                                      max-width: calc(100% - 180px);
+                                      white-space: nowrap;
+                                      overflow: hidden;
+                                      text-overflow: ellipsis;
+                                    }
+                                    iframe {
+                                      width: 100vw;
+                                      height: 100vh;
+                                      border: none;
+                                    }
+                                  </style>
+                                </head>
+                                <body>
+                                  <button class="close-btn" onclick="window.close()">✕ 닫기</button>
+                                  <div class="title">${activeSource.title}</div>
+                                  <iframe src="${activeSource.youtubeUrl}" allow="autoplay; fullscreen; camera; microphone" allowfullscreen></iframe>
+                                </body>
+                              </html>
+                            `);
+                            newWindow.document.close();
+
+                            // HTTP로 직접 이동
+                            setTimeout(() => {
+                              newWindow.location.href = activeSource.youtubeUrl;
+                            }, 100);
+                          }
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                      >
+                        🎬 영상 보기
+                      </button>
+                    </div>
                   ) : (
                     <p className="text-white flex items-center justify-center h-full">지원되지 않는 영상 형식입니다.</p>
                   )}

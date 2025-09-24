@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Modal from './common/Modal';
 import Input from './common/Input';
 import Button from './common/Button';
-import { findRegionByName, allJejuRegions } from '../data/jejuRegions';
+import { findLocationByName, JEJU_LOCATIONS, JejuLocation } from '../data/jejuLocations';
 
 interface GpsCoordinateModalProps {
   isOpen: boolean;
@@ -104,23 +104,47 @@ const GpsCoordinateModal: React.FC<GpsCoordinateModalProps> = ({ isOpen, onClose
         } else {
           console.log('Google API 결과 없음:', data.status);
         }
+
+        // Google API 성공 여부와 관계없이 우리 제주 지역 데이터도 검색
+        console.log('제주 지역 데이터 추가 검색 중...');
+        const foundLocation = findLocationByName(searchQuery);
+        if (foundLocation) {
+          // 중복 검사 - Google 결과와 같은 위치가 아닌 경우만 추가
+          const isDuplicate = results.some(result =>
+            Math.abs(result.latitude - foundLocation.latitude) < 0.001 &&
+            Math.abs(result.longitude - foundLocation.longitude) < 0.001
+          );
+
+          if (!isDuplicate) {
+            results.push({
+              name: `${foundLocation.name} (${foundLocation.city} ${foundLocation.type})`,
+              latitude: foundLocation.latitude,
+              longitude: foundLocation.longitude,
+              source: 'hardcoded',
+              keywords: [foundLocation.city, foundLocation.type],
+              landmarks: [foundLocation.name]
+            });
+            console.log('제주 지역 데이터 추가:', foundLocation.name);
+          }
+        }
+
       } catch (googleError) {
         console.error('Google API 검색 실패:', googleError);
-        // Google API 실패 시 하드코딩 데이터로 백업
-        console.log('Google API 실패, 하드코딩 데이터 검색 중...');
-        const foundRegion = findRegionByName(searchQuery);
-        if (foundRegion) {
+        // Google API 실패 시 제주 지역 데이터로 백업
+        console.log('Google API 실패, 제주 지역 데이터 검색 중...');
+        const foundLocation = findLocationByName(searchQuery);
+        if (foundLocation) {
           results.push({
-            name: `${foundRegion.name} (백업)`,
-            latitude: foundRegion.lat,
-            longitude: foundRegion.lng,
+            name: `${foundLocation.name} (${foundLocation.city} ${foundLocation.type})`,
+            latitude: foundLocation.latitude,
+            longitude: foundLocation.longitude,
             source: 'hardcoded',
-            keywords: foundRegion.aliases,
-            landmarks: foundRegion.landmarks
+            keywords: [foundLocation.city, foundLocation.type],
+            landmarks: [foundLocation.name]
           });
-          console.log('하드코딩 백업 데이터 사용:', foundRegion.name);
+          console.log('제주 지역 백업 데이터 사용:', foundLocation.name);
         } else {
-          setError('Google Maps API를 사용할 수 없고 해당 지역의 백업 데이터도 없습니다.');
+          setError('Google Maps API를 사용할 수 없고 해당 지역의 제주 데이터도 없습니다.');
         }
       }
 

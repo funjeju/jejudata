@@ -10,14 +10,23 @@ import LiveWeatherViewModal from './LiveWeatherViewModal';
 import { captureWeatherScene, analyzeThumbnailsBatch, type VisualAnalysisResult, type BatchAnalysisProgress } from '../services/youtubeCapture';
 import { findNearbySources } from '../utils/geoUtils';
 import { findRegionByName, allJejuRegions } from '../data/jejuRegions';
+import { findLocationByName, JEJU_LOCATIONS } from '../data/jejuLocations';
+import { calculateDistance, formatDistance } from '../utils/gpsUtils';
 
-// 유튜브 URL 감지 함수
+// 유튜브 URL 감지 함수 (더 관대한 버전)
 const isYouTubeUrl = (url: string): boolean => {
+  if (!url || typeof url !== 'string') return false;
+
   try {
+    // URL 객체로 파싱 시도
     const urlObj = new URL(url);
-    return urlObj.hostname === 'www.youtube.com' || urlObj.hostname === 'youtube.com' || urlObj.hostname === 'youtu.be';
+    return urlObj.hostname === 'www.youtube.com' ||
+           urlObj.hostname === 'youtube.com' ||
+           urlObj.hostname === 'youtu.be' ||
+           urlObj.hostname === 'm.youtube.com';
   } catch (error) {
-    return false;
+    // URL 파싱 실패 시 문자열 검사
+    return url.includes('youtube.com') || url.includes('youtu.be');
   }
 };
 
@@ -51,6 +60,12 @@ interface Message {
   content: string;
   weatherCard?: WeatherCardData;
   weatherCardCompleted?: boolean; // WeatherCard 완료 상태 추적
+  cctvOptions?: Array<{
+    id: string;
+    title: string;
+    distance: string;
+    gps: string;
+  }>;
 }
 
 interface WeatherChatModalProps {
@@ -75,6 +90,79 @@ const WeatherChatModal: React.FC<WeatherChatModalProps> = ({ isOpen, onClose, we
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // GPS 기반으로 가장 가까운 CCTV 3개 찾기
+  const findNearestCCTVs = (locationName: string, count: number = 3) => {
+    // 지역명으로 GPS 좌표 찾기
+    const location = findLocationByName(locationName);
+    if (!location) return [];
+
+    // GPS 좌표가 있는 날씨 소스들만 필터링하고 거리 계산
+    const sourcesWithDistance = weatherSources
+      .filter(source => source.latitude && source.longitude)
+      .map(source => ({
+        ...source,
+        distance: calculateDistance(
+          location.latitude,
+          location.longitude,
+          source.latitude!,
+          source.longitude!
+        )
+      }))
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, count);
+
+    return sourcesWithDistance;
+  };
+
+  // CCTV 선택 시 날씨 카드 생성
+  const handleCCTVSelection = (cctvId: string) => {
+    const selectedSource = weatherSources.find(source => source.id === cctvId);
+    if (!selectedSource) return;
+
+    // 사용자 메시지 추가
+    setMessages(prev => [...prev, {
+      role: 'user',
+      content: selectedSource.title
+    }]);
+
+    // AI 응답과 날씨 카드 추가
+    setMessages(prev => [...prev, {
+      role: 'ai',
+      content: `📹 **${selectedSource.title}** 실시간 영상 분석을 시작합니다...`,
+      weatherCard: {
+        status: 'analyzing',
+        sourceTitle: selectedSource.title,
+        youtubeUrl: selectedSource.youtubeUrl
+      }
+    }]);
+
+    // 날씨 캡처 시작
+    captureWeatherScene(selectedSource.youtubeUrl, selectedSource.title)
+      .then(result => {
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.weatherCard && msg.weatherCard.sourceTitle === selectedSource.title
+              ? { ...msg, weatherCard: result, weatherCardCompleted: true }
+              : msg
+          )
+        );
+      })
+      .catch(error => {
+        console.error('날씨 캡처 실패:', error);
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.weatherCard && msg.weatherCard.sourceTitle === selectedSource.title
+              ? {
+                  ...msg,
+                  content: `❌ ${selectedSource.title} 영상 분석에 실패했습니다. 다른 CCTV를 시도해보세요.`,
+                  weatherCard: undefined
+                }
+              : msg
+          )
+        );
+      });
   };
 
   useEffect(() => {
@@ -110,7 +198,7 @@ const WeatherChatModal: React.FC<WeatherChatModalProps> = ({ isOpen, onClose, we
 }
 \`\`\`
 
-**SINGLE LOCATION WEATHER**: When a user asks about the weather in a specific location (e.g., "한라산 날씨 어때?", "성산읍은 지금 비 와?", "백록담", "1100고지", "노형동 날씨"), you MUST respond with ONLY a JSON object:
+**SINGLE LOCATION WEATHER**: When a user asks about the weather in a specific registered location (e.g., "한라산 날씨 어때?", "성산읍은 지금 비 와?", "백록담", "1100고지"), you MUST respond with ONLY a JSON object:
 \`\`\`json
 {
   "weatherInquiry": {
@@ -120,12 +208,12 @@ const WeatherChatModal: React.FC<WeatherChatModalProps> = ({ isOpen, onClose, we
 }
 \`\`\`
 
-**LOCATION WITH GEOCODING**: For broad area queries (e.g., "노형동", "애월읍", "조천읍"), you MUST also get GPS coordinates:
+**ADMINISTRATIVE REGION QUERIES**: For administrative region/district queries (e.g., "강정동 날씨", "노형동 날씨", "애월읍 날씨", "조천읍 날씨", "대정읍 날씨", "한림읍 날씨", "삼도동 날씨", "연동 날씨", "일도동 날씨", "용담동 날씨" etc.), you MUST use GPS-based search:
 \`\`\`json
 {
   "geoInquiry": {
-    "locationQuery": "노형동",
-    "responseText": "노형동 지역의 날씨를 확인하기 위해 주변 CCTV들을 찾아보겠습니다..."
+    "locationQuery": "강정동",
+    "responseText": "강정동 지역의 날씨를 확인하기 위해 주변 CCTV들을 찾아보겠습니다..."
   }
 }
 \`\`\`
@@ -316,35 +404,30 @@ ${currentInput}
                         return updatedMessages;
                     });
 
-                    // 하드코딩된 지역 데이터에서 먼저 찾기
-                    const foundRegion = findRegionByName(locationQuery);
+                    // 제주 지역 데이터에서 GPS 좌표 기반으로 가장 가까운 CCTV 찾기
+                    const nearestCCTVs = findNearestCCTVs(locationQuery, 3);
 
-                    if (foundRegion) {
-                        // 주변 CCTV 찾기
-                        const nearbyOptions = findNearbySources(
-                            foundRegion.lat,
-                            foundRegion.lng,
-                            weatherSources.filter(s => isYouTubeUrl(s.youtubeUrl))
-                        );
+                    if (nearestCCTVs.length > 0) {
+                        const foundLocation = findLocationByName(locationQuery);
+                        const locationInfo = foundLocation ? ` (${foundLocation.city} ${foundLocation.type})` : '';
 
-                        if (nearbyOptions.length > 0) {
-                            const optionsList = nearbyOptions.map((option, index) =>
-                                `${index + 1}. **${option.source.title}** (${option.direction} ${option.distance}km)`
-                            ).join('\n');
-
-                            const landmarkInfo = foundRegion.landmarks ? ` (${foundRegion.landmarks[0]} 기준)` : '';
-
-                            setMessages(prev => [...prev, {
-                                role: 'ai',
-                                content: `📍 **${locationQuery}**${landmarkInfo}의 날씨를 확인할 수 있는 주변 CCTV들입니다:\n\n${optionsList}\n\n🎯 **어느 지역의 실시간 영상을 보시겠어요?**\n지역명을 말씀해주시면 바로 분석해드릴게요!`
-                            }]);
-                        } else {
-                            setMessages(prev => [...prev, {
-                                role: 'ai',
-                                content: `죄송합니다. ${locationQuery} 주변에 등록된 CCTV를 찾을 수 없습니다. CCTV에 GPS 좌표가 설정되지 않았을 수 있습니다.`
-                            }]);
-                        }
+                        setMessages(prev => [...prev, {
+                            role: 'ai',
+                            content: `📍 **${locationQuery}**${locationInfo} 주변의 가장 가까운 실시간 CCTV ${nearestCCTVs.length}개를 찾았습니다:\n\n🎯 **원하는 CCTV를 선택하면 실시간 영상과 날씨 정보를 확인할 수 있습니다:**`,
+                            cctvOptions: nearestCCTVs.map(cctv => ({
+                                id: cctv.id,
+                                title: cctv.title,
+                                distance: formatDistance(cctv.distance),
+                                gps: `${cctv.latitude?.toFixed(4)}, ${cctv.longitude?.toFixed(4)}`
+                            }))
+                        } as any]);
                     } else {
+                        setMessages(prev => [...prev, {
+                            role: 'ai',
+                            content: `죄송합니다. ${locationQuery} 주변에 등록된 CCTV를 찾을 수 없습니다. CCTV에 GPS 좌표가 설정되지 않았을 수 있습니다.`
+                        }]);
+
+                        // 하드코딩된 데이터에 없으면 AI에게 시도 (기존 로직)
                         // 하드코딩된 데이터에 없으면 AI에게 시도 (기존 로직)
                         const geoPrompt = `제주도 ${locationQuery}의 대표적인 GPS 좌표를 알려주세요.
                         JSON 형식으로만 응답해주세요:
@@ -657,6 +740,34 @@ ${weatherInfo}
                                             </div>
                                         </div>
                                     ) : null}
+
+                                    {/* CCTV 선택 버튼들 */}
+                                    {msg.cctvOptions && (
+                                        <div className="mt-3 space-y-2">
+                                            {msg.cctvOptions.map((option, optionIndex) => (
+                                                <button
+                                                    key={optionIndex}
+                                                    onClick={() => handleCCTVSelection(option.id)}
+                                                    className="w-full p-3 text-left bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors duration-200 group"
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex-1">
+                                                            <div className="font-semibold text-blue-800 group-hover:text-blue-900">
+                                                                🎬 {option.title}
+                                                            </div>
+                                                            <div className="text-sm text-blue-600 mt-1">
+                                                                거리: {option.distance} | GPS: {option.gps}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-blue-500 group-hover:text-blue-700">
+                                                            ▶
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
                                     {msg.weatherCard && <WeatherCard initialData={msg.weatherCard} onComplete={() => handleWeatherCardComplete(msg.weatherCard!, index)} skipAnimation={msg.weatherCardCompleted || false} />}
                                 </div>
                             </div>

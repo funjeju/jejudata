@@ -4,6 +4,7 @@ import Input from './common/Input';
 import Button from './common/Button';
 import type { WeatherSource } from '../types';
 import GpsCoordinateModal from './GpsCoordinateModal';
+import { findLocationByName, getAllLocationNames, JEJU_LOCATIONS } from '../data/jejuLocations';
 
 interface AddWeatherSourceModalProps {
   isOpen: boolean;
@@ -22,6 +23,9 @@ const AddWeatherSourceModal: React.FC<AddWeatherSourceModalProps> = ({ isOpen, o
   const [longitude, setLongitude] = useState('');
   const [error, setError] = useState('');
   const [isGpsModalOpen, setIsGpsModalOpen] = useState(false);
+  const [locationSearch, setLocationSearch] = useState('');
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [filteredLocations, setFilteredLocations] = useState<typeof JEJU_LOCATIONS>([]);
 
   useEffect(() => {
     if (isOpen && initialData) {
@@ -43,10 +47,37 @@ const AddWeatherSourceModal: React.FC<AddWeatherSourceModalProps> = ({ isOpen, o
       setLatitude('');
       setLongitude('');
       setError('');
+      setLocationSearch('');
+      setShowLocationSuggestions(false);
     }
   }, [isOpen, initialData]);
 
+  // 지역 검색 로직
+  useEffect(() => {
+    if (locationSearch.trim()) {
+      const filtered = JEJU_LOCATIONS.filter(location =>
+        location.name.toLowerCase().includes(locationSearch.toLowerCase()) ||
+        location.city.includes(locationSearch) ||
+        location.type.includes(locationSearch)
+      );
+      setFilteredLocations(filtered.slice(0, 10)); // 최대 10개까지
+      setShowLocationSuggestions(true);
+    } else {
+      setFilteredLocations([]);
+      setShowLocationSuggestions(false);
+    }
+  }, [locationSearch]);
+
+  const handleLocationSelect = (location: typeof JEJU_LOCATIONS[0]) => {
+    setLatitude(location.latitude.toString());
+    setLongitude(location.longitude.toString());
+    setLocationSearch(location.name);
+    setShowLocationSuggestions(false);
+  };
+
   const handleSave = () => {
+    alert('저장 버튼 클릭됨!');
+    console.log('handleSave 함수 호출됨!');
     if (!youtubeUrl.trim() || !title.trim()) {
       setError('영상 주소와 지역 제목은 필수 항목입니다.');
       return;
@@ -60,7 +91,13 @@ const AddWeatherSourceModal: React.FC<AddWeatherSourceModalProps> = ({ isOpen, o
     const lat = latitude.trim() ? parseFloat(latitude) : undefined;
     const lng = longitude.trim() ? parseFloat(longitude) : undefined;
 
-    onSave({
+    console.log('AddWeatherSourceModal - 저장 데이터:', {
+      title,
+      latitude: lat,
+      longitude: lng
+    });
+
+    const saveData = {
       id: initialData?.id,
       youtubeUrl,
       title,
@@ -69,7 +106,19 @@ const AddWeatherSourceModal: React.FC<AddWeatherSourceModalProps> = ({ isOpen, o
       keywords: keywordArray,
       latitude: lat,
       longitude: lng
-    });
+    };
+
+    console.log('onSave 호출 직전 데이터:', saveData);
+    alert('onSave 호출 시작');
+
+    try {
+      onSave(saveData);
+      alert('onSave 호출 완료');
+    } catch (error) {
+      alert('onSave 호출 실패: ' + error);
+      console.error('onSave 에러:', error);
+    }
+
     onClose();
   };
 
@@ -133,6 +182,42 @@ const AddWeatherSourceModal: React.FC<AddWeatherSourceModalProps> = ({ isOpen, o
             onChange={(e) => setKeywords(e.target.value)}
             placeholder="예: 백록담, 1100고지, 어승생악, 윗세오름"
           />
+
+          {/* 제주 지역 검색 */}
+          <div className="relative">
+            <label htmlFor="locationSearch" className="block text-sm font-medium text-gray-700 mb-1">
+              제주 지역 검색 (GPS 자동 입력)
+            </label>
+            <input
+              id="locationSearch"
+              type="text"
+              value={locationSearch}
+              onChange={(e) => setLocationSearch(e.target.value)}
+              onFocus={() => setShowLocationSuggestions(locationSearch.trim() !== '')}
+              onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 200)} // 클릭 시간을 위해 지연
+              placeholder="지역명을 입력하세요 (예: 제주시, 한라산, 성산읍)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+
+            {showLocationSuggestions && filteredLocations.length > 0 && (
+              <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                {filteredLocations.map((location, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => handleLocationSelect(location)}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none border-b border-gray-100 last:border-b-0"
+                  >
+                    <div className="font-medium">{location.name}</div>
+                    <div className="text-sm text-gray-500">
+                      {location.city} {location.type} | 위도: {location.latitude}, 경도: {location.longitude}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div>
             <div className="grid grid-cols-2 gap-3">
               <Input
