@@ -4,7 +4,7 @@ import Input from './common/Input';
 import Button from './common/Button';
 import type { WeatherSource } from '../types';
 import GpsCoordinateModal from './GpsCoordinateModal';
-import { findLocationByName, getAllLocationNames, JEJU_LOCATIONS } from '../data/jejuLocations';
+import { findRegionByName, getAllRegionNames, loadAllRegions, findNearestRegion, type RegionInfo } from '../data/csvRegionLoader';
 
 interface AddWeatherSourceModalProps {
   isOpen: boolean;
@@ -25,7 +25,7 @@ const AddWeatherSourceModal: React.FC<AddWeatherSourceModalProps> = ({ isOpen, o
   const [isGpsModalOpen, setIsGpsModalOpen] = useState(false);
   const [locationSearch, setLocationSearch] = useState('');
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
-  const [filteredLocations, setFilteredLocations] = useState<typeof JEJU_LOCATIONS>([]);
+  const [filteredLocations, setFilteredLocations] = useState<RegionInfo[]>([]);  const [autoDetectedRegion, setAutoDetectedRegion] = useState<RegionInfo | null>(null);
 
   useEffect(() => {
     if (isOpen && initialData) {
@@ -55,23 +55,46 @@ const AddWeatherSourceModal: React.FC<AddWeatherSourceModalProps> = ({ isOpen, o
   // 지역 검색 로직
   useEffect(() => {
     if (locationSearch.trim()) {
-      const filtered = JEJU_LOCATIONS.filter(location =>
-        location.name.toLowerCase().includes(locationSearch.toLowerCase()) ||
-        location.city.includes(locationSearch) ||
-        location.type.includes(locationSearch)
-      );
-      setFilteredLocations(filtered.slice(0, 10)); // 최대 10개까지
-      setShowLocationSuggestions(true);
+      loadAllRegions().then(regions => {
+        const filtered = regions.filter(region =>
+          region.name.toLowerCase().includes(locationSearch.toLowerCase()) ||
+          region.type.includes(locationSearch) ||
+          (region.aliases && region.aliases.some(alias =>
+            alias.toLowerCase().includes(locationSearch.toLowerCase())
+          ))
+        );
+        setFilteredLocations(filtered.slice(0, 10)); // 최대 10개까지
+        setShowLocationSuggestions(true);
+      });
     } else {
       setFilteredLocations([]);
       setShowLocationSuggestions(false);
     }
   }, [locationSearch]);
 
-  const handleLocationSelect = (location: typeof JEJU_LOCATIONS[0]) => {
-    setLatitude(location.latitude.toString());
-    setLongitude(location.longitude.toString());
+  // GPS 좌표 변경 시 자동 지역 감지
+  useEffect(() => {
+    const lat = parseFloat(latitude);
+    const lng = parseFloat(longitude);
+
+    if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+      findNearestRegion(lat, lng).then(region => {
+        if (region) {
+          setAutoDetectedRegion(region);
+          // 지역 검색이 비어있으면 자동 채우기
+          if (!locationSearch.trim()) {
+            setLocationSearch(region.name);
+          }
+        }
+      });
+    }
+  }, [latitude, longitude, locationSearch]);
+
+  const handleLocationSelect = (location: RegionInfo) => {
+    setLatitude(location.lat.toString());
+    setLongitude(location.lng.toString());
     setLocationSearch(location.name);
+    setAutoDetectedRegion(location);
     setShowLocationSuggestions(false);
   };
 
@@ -109,13 +132,12 @@ const AddWeatherSourceModal: React.FC<AddWeatherSourceModalProps> = ({ isOpen, o
     };
 
     console.log('onSave 호출 직전 데이터:', saveData);
-    alert('onSave 호출 시작');
 
     try {
       onSave(saveData);
-      alert('onSave 호출 완료');
+      console.log('onSave 호출 완료');
     } catch (error) {
-      alert('onSave 호출 실패: ' + error);
+      console.error('onSave 호출 실패:', error);
       console.error('onSave 에러:', error);
     }
 

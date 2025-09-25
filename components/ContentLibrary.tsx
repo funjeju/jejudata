@@ -13,6 +13,7 @@ interface ContentLibraryProps {
   onAddNew: () => void;
   onEdit: (spot: Place) => void;
   onView: (spot: Place) => void;
+  onDelete: (spot: Place) => void;
   onOpenWeatherChat: () => void;
   onOpenTripPlanner: () => void;
 }
@@ -46,7 +47,7 @@ const StatusBadge: React.FC<{ status: Place['status']; onClick?: () => void }> =
 };
 
 
-const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit, onView, onOpenWeatherChat, onOpenTripPlanner }) => {
+const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit, onView, onDelete, onOpenWeatherChat, onOpenTripPlanner }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -54,7 +55,22 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
   const [sortConfig, setSortConfig] = useState<{ key: keyof Place; direction: 'asc' | 'desc' }>({ key: 'updated_at', direction: 'desc' });
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [deleteConfirmSpot, setDeleteConfirmSpot] = useState<Place | null>(null);
 
+  const handleDeleteClick = (spot: Place) => {
+    setDeleteConfirmSpot(spot);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (deleteConfirmSpot) {
+      onDelete(deleteConfirmSpot);
+      setDeleteConfirmSpot(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteConfirmSpot(null);
+  };
 
   const filteredAndSortedSpots = useMemo(() => {
     let filtered = spots;
@@ -234,8 +250,9 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
                     />
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{spot.updated_at ? new Date((spot.updated_at as any).seconds * 1000).toLocaleString() : 'N/A'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                   <Button onClick={() => onEdit(spot)} variant="secondary" size="normal">수정</Button>
+                  <Button onClick={() => handleDeleteClick(spot)} variant="secondary" size="normal" className="bg-red-500 text-white hover:bg-red-600 focus:ring-red-400">삭제</Button>
                 </td>
               </tr>
             )) : (
@@ -257,6 +274,40 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
         allSpots={spots}
         filteredSpots={filteredAndSortedSpots}
       />
+
+      {/* 삭제 확인 모달 */}
+      {deleteConfirmSpot && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <div className="flex-shrink-0">
+                <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.962-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-lg font-medium text-gray-900">스팟 삭제 확인</h3>
+              </div>
+            </div>
+            <div className="mb-4">
+              <p className="text-sm text-gray-500">
+                <strong>"{deleteConfirmSpot.place_name}"</strong>을(를) 정말로 삭제하시겠습니까?
+              </p>
+              <p className="text-sm text-red-600 mt-2">
+                이 작업은 되돌릴 수 없습니다.
+              </p>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <Button onClick={handleDeleteCancel} variant="secondary">
+                취소
+              </Button>
+              <Button onClick={handleDeleteConfirm} className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-500">
+                삭제
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

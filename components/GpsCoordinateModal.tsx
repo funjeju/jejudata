@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Modal from './common/Modal';
 import Input from './common/Input';
 import Button from './common/Button';
-import { findLocationByName, JEJU_LOCATIONS, JejuLocation } from '../data/jejuLocations';
+import { findRegionByName, loadAllRegions, type RegionInfo } from '../data/csvRegionLoader';
 
 interface GpsCoordinateModalProps {
   isOpen: boolean;
@@ -107,6 +107,8 @@ const GpsCoordinateModal: React.FC<GpsCoordinateModalProps> = ({ isOpen, onClose
 
         // Google API 성공 여부와 관계없이 우리 제주 지역 데이터도 검색
         console.log('제주 지역 데이터 추가 검색 중...');
+
+        // 기존 jejuLocations 검색
         const foundLocation = findLocationByName(searchQuery);
         if (foundLocation) {
           // 중복 검사 - Google 결과와 같은 위치가 아닌 경우만 추가
@@ -128,10 +130,34 @@ const GpsCoordinateModal: React.FC<GpsCoordinateModalProps> = ({ isOpen, onClose
           }
         }
 
+        // 새로운 jejuRegions 검색 (리 단위까지 포함)
+        const foundRegion = findRegionByName(searchQuery);
+        if (foundRegion) {
+          // 중복 검사 - 기존 결과와 같은 위치가 아닌 경우만 추가
+          const isDuplicate = results.some(result =>
+            Math.abs(result.latitude - foundRegion.lat) < 0.001 &&
+            Math.abs(result.longitude - foundRegion.lng) < 0.001
+          );
+
+          if (!isDuplicate) {
+            results.push({
+              name: `${foundRegion.name} (${foundRegion.area} ${foundRegion.type})`,
+              latitude: foundRegion.lat,
+              longitude: foundRegion.lng,
+              source: 'jejuRegions',
+              keywords: [foundRegion.area, foundRegion.type],
+              landmarks: foundRegion.landmarks || [foundRegion.name]
+            });
+            console.log('제주 리 단위 데이터 추가:', foundRegion.name);
+          }
+        }
+
       } catch (googleError) {
         console.error('Google API 검색 실패:', googleError);
         // Google API 실패 시 제주 지역 데이터로 백업
         console.log('Google API 실패, 제주 지역 데이터 검색 중...');
+
+        // 기존 jejuLocations 검색
         const foundLocation = findLocationByName(searchQuery);
         if (foundLocation) {
           results.push({
@@ -143,7 +169,23 @@ const GpsCoordinateModal: React.FC<GpsCoordinateModalProps> = ({ isOpen, onClose
             landmarks: [foundLocation.name]
           });
           console.log('제주 지역 백업 데이터 사용:', foundLocation.name);
-        } else {
+        }
+
+        // 새로운 jejuRegions 백업 검색
+        const foundRegion = findRegionByName(searchQuery);
+        if (foundRegion) {
+          results.push({
+            name: `${foundRegion.name} (${foundRegion.area} ${foundRegion.type})`,
+            latitude: foundRegion.lat,
+            longitude: foundRegion.lng,
+            source: 'jejuRegions',
+            keywords: [foundRegion.area, foundRegion.type],
+            landmarks: foundRegion.landmarks || [foundRegion.name]
+          });
+          console.log('제주 리 단위 백업 데이터 사용:', foundRegion.name);
+        }
+
+        if (results.length === 0) {
           setError('Google Maps API를 사용할 수 없고 해당 지역의 제주 데이터도 없습니다.');
         }
       }

@@ -100,7 +100,21 @@ const App: React.FC = () => {
       console.log(`Firestore에서 실시간으로 날씨 소스 ${sourcesArray.length}개를 불러왔습니다.`);
     }, (error) => {
       console.error('Error in weatherSources listener:', error);
-      setWeatherSources([]);
+      // Firestore 실패 시 localStorage에서 백업 읽기
+      console.log('Firestore 실패 - localStorage에서 날씨 소스 백업 읽기 시도...');
+      const localData = localStorage.getItem('jejuWeatherSources');
+      if (localData) {
+        try {
+          const sourcesArray: WeatherSource[] = JSON.parse(localData);
+          setWeatherSources(sourcesArray);
+          console.log(`localStorage에서 날씨 소스 ${sourcesArray.length}개를 불러왔습니다.`);
+        } catch (parseError) {
+          console.error('localStorage 파싱 오류:', parseError);
+          setWeatherSources([]);
+        }
+      } else {
+        setWeatherSources([]);
+      }
     });
 
     return () => unsubscribe();
@@ -239,14 +253,21 @@ const App: React.FC = () => {
           return newSources;
         });
 
-        // Firestore에도 백업 저장 시도
+        // Firestore에도 백업 저장 시도 (undefined 제거 후)
         try {
           console.log('Firestore에 저장할 데이터:', weatherSourceData);
           console.log('저장할 GPS 좌표:', { lat: weatherSourceData.latitude, lng: weatherSourceData.longitude });
-          await setDoc(doc(db, "weatherSources", id), weatherSourceData);
+
+          // undefined 제거를 위해 sanitizePlaceForFirestore의 deepCloneWithoutUndefined 함수 재활용
+          const sanitizedData = JSON.parse(JSON.stringify(weatherSourceData, (key, value) => {
+            return value === undefined ? null : value;
+          }));
+
+          await setDoc(doc(db, "weatherSources", id), sanitizedData);
           console.log('날씨 소스 Firestore에 백업 저장 완료');
         } catch (firestoreError) {
           console.warn('날씨 소스 Firestore 백업 저장 실패:', firestoreError);
+          console.error('Firestore 오류 상세:', firestoreError);
         }
 
         console.log('날씨 소스 저장 완료');
@@ -370,6 +391,11 @@ const App: React.FC = () => {
             });
         });
 
+        // spotToView도 업데이트 (UI 즉시 갱신을 위해)
+        if (spotForFirebase && spotToView && spotToView.place_id === placeId) {
+            setSpotToView(spotForFirebase);
+        }
+
         if (spotForFirebase) {
             handleSaveToFirebase(spotForFirebase).catch(error => {
                 console.error('Error saving suggestion to Firestore:', error);
@@ -450,6 +476,11 @@ const App: React.FC = () => {
             });
         });
 
+        // spotToView도 업데이트 (UI 즉시 갱신을 위해)
+        if (spotForFirebase && spotToView && spotToView.place_id === placeId) {
+            setSpotToView(spotForFirebase);
+        }
+
         if (spotForFirebase) {
             handleSaveToFirebase(spotForFirebase).catch(error => {
                 console.error('Error updating suggestion in Firestore:', error);
@@ -486,7 +517,27 @@ const App: React.FC = () => {
     setSpotToView(spot);
     setStep('view');
   };
-  
+
+  const handleDeleteSpot = async (spot: Place) => {
+    try {
+      // Firestore에서 삭제
+      await deleteDoc(doc(db, "spots", spot.place_id));
+      console.log('스팟 삭제 완료:', spot.place_name);
+
+      // 로컬 state에서도 제거
+      setSpots(prevSpots => prevSpots.filter(s => s.place_id !== spot.place_id));
+
+      // 현재 보고 있던 스팟이 삭제된 경우 라이브러리로 돌아가기
+      if (spotToView && spotToView.place_id === spot.place_id) {
+        setSpotToView(null);
+        setStep('library');
+      }
+    } catch (error) {
+      console.error('스팟 삭제 실패:', error);
+      alert('스팟 삭제에 실패했습니다. 다시 시도해주세요.');
+    }
+  };
+
   const handleCloseModal = () => setIsModalOpen(false);
 
   const handleNavigateFromChatbot = (placeId: string) => {
@@ -566,6 +617,7 @@ const App: React.FC = () => {
                   onAddNew={handleStartNew}
                   onEdit={handleEditSpot}
                   onView={handleViewSpot}
+                  onDelete={handleDeleteSpot}
                   onOpenWeatherChat={() => setIsWeatherChatOpen(true)}
                   onOpenTripPlanner={() => setIsTripPlannerOpen(true)}
                 />;

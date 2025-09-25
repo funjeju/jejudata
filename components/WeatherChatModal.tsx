@@ -9,8 +9,7 @@ import WeatherCard from './WeatherCard';
 import LiveWeatherViewModal from './LiveWeatherViewModal';
 import { captureWeatherScene, analyzeThumbnailsBatch, type VisualAnalysisResult, type BatchAnalysisProgress } from '../services/youtubeCapture';
 import { findNearbySources } from '../utils/geoUtils';
-import { findRegionByName, allJejuRegions } from '../data/jejuRegions';
-import { findLocationByName, JEJU_LOCATIONS } from '../data/jejuLocations';
+import { findRegionByName, findNearestRegion, loadAllRegions } from '../data/csvRegionLoader';
 import { calculateDistance, formatDistance } from '../utils/gpsUtils';
 
 // 유튜브 URL 감지 함수 (더 관대한 버전)
@@ -93,10 +92,13 @@ const WeatherChatModal: React.FC<WeatherChatModalProps> = ({ isOpen, onClose, we
   };
 
   // GPS 기반으로 가장 가까운 CCTV 3개 찾기
-  const findNearestCCTVs = (locationName: string, count: number = 3) => {
-    // 지역명으로 GPS 좌표 찾기
-    const location = findLocationByName(locationName);
-    if (!location) return [];
+  const findNearestCCTVs = (locationName: string, count: number = 3, lat?: number, lng?: number) => {
+    // 지역명으로 GPS 좌표 찾기 (jejuLocations 우선, 없으면 jejuRegions)
+    // GPS 좌표가 직접 제공되지 않았다면 빈 배열 반환
+    if (!lat || !lng) {
+      console.error('GPS 좌표가 없어서 CCTV를 찾을 수 없습니다.');
+      return [];
+    }
 
     // GPS 좌표가 있는 날씨 소스들만 필터링하고 거리 계산
     const sourcesWithDistance = weatherSources
@@ -104,8 +106,8 @@ const WeatherChatModal: React.FC<WeatherChatModalProps> = ({ isOpen, onClose, we
       .map(source => ({
         ...source,
         distance: calculateDistance(
-          location.latitude,
-          location.longitude,
+          lat,
+          lng,
           source.latitude!,
           source.longitude!
         )
@@ -140,11 +142,12 @@ const WeatherChatModal: React.FC<WeatherChatModalProps> = ({ isOpen, onClose, we
 
     // 날씨 캡처 시작
     captureWeatherScene(selectedSource.youtubeUrl, selectedSource.title)
-      .then(result => {
+      .then(async result => {
+        // WeatherCard 업데이트 (weatherCardCompleted를 설정하지 않음 - onComplete 콜백이 실행되도록)
         setMessages(prev =>
           prev.map(msg =>
             msg.weatherCard && msg.weatherCard.sourceTitle === selectedSource.title
-              ? { ...msg, weatherCard: result, weatherCardCompleted: true }
+              ? { ...msg, weatherCard: { ...result, youtubeUrl: selectedSource.youtubeUrl } }
               : msg
           )
         );
@@ -208,7 +211,7 @@ const WeatherChatModal: React.FC<WeatherChatModalProps> = ({ isOpen, onClose, we
 }
 \`\`\`
 
-**ADMINISTRATIVE REGION QUERIES**: For administrative region/district queries (e.g., "강정동 날씨", "노형동 날씨", "애월읍 날씨", "조천읍 날씨", "대정읍 날씨", "한림읍 날씨", "삼도동 날씨", "연동 날씨", "일도동 날씨", "용담동 날씨" etc.), you MUST use GPS-based search:
+**LOCATION-BASED QUERIES**: For ANY specific location in Jeju Island including administrative regions, tourist spots, volcanic cones, villages, etc. (e.g., "신례리 날씨", "봉성리 날씨", "노형동 날씨", "한라산 날씨", "성산일출봉 날씨", "거문오름 날씨", "우도 날씨" etc.), you MUST use GPS-based search. The system has a comprehensive database of 484 locations:
 \`\`\`json
 {
   "geoInquiry": {
@@ -228,8 +231,9 @@ const WeatherChatModal: React.FC<WeatherChatModalProps> = ({ isOpen, onClose, we
 - 일몰, 노을, 석양 -> "일몰"
 - 안개, 뿌연, 시야불량 -> "안개"
 
-- If a user asks about a location NOT on your list, you MUST state that you do not have real-time information for that specific place and then list the locations you DO have information for.
-- For general conversation, respond naturally in plain text. DO NOT use JSON.`;
+- The system can search GPS coordinates for virtually any location in Jeju Island from a comprehensive database of 484 places.
+- For general conversation, respond naturally in plain text. DO NOT use JSON.
+- IMPORTANT: Do NOT provide a fixed list of available locations. Instead, always try GPS-based search first for any Jeju location.`;
 
         const newChat = ai.chats.create({
             model: 'gemini-2.5-flash',
@@ -404,27 +408,36 @@ ${currentInput}
                         return updatedMessages;
                     });
 
-                    // 제주 지역 데이터에서 GPS 좌표 기반으로 가장 가까운 CCTV 찾기
-                    const nearestCCTVs = findNearestCCTVs(locationQuery, 3);
+                    // CSV 데이터에서 지역 정보 찾기
+                    const region = await findRegionByName(locationQuery);
 
-                    if (nearestCCTVs.length > 0) {
-                        const foundLocation = findLocationByName(locationQuery);
-                        const locationInfo = foundLocation ? ` (${foundLocation.city} ${foundLocation.type})` : '';
+                    if (region) {
+                        // 찾은 지역의 GPS 좌표로 가장 가까운 CCTV 찾기
+                        const nearestCCTVs = findNearestCCTVs(locationQuery, 3, region.lat, region.lng);
 
-                        setMessages(prev => [...prev, {
-                            role: 'ai',
-                            content: `📍 **${locationQuery}**${locationInfo} 주변의 가장 가까운 실시간 CCTV ${nearestCCTVs.length}개를 찾았습니다:\n\n🎯 **원하는 CCTV를 선택하면 실시간 영상과 날씨 정보를 확인할 수 있습니다:**`,
-                            cctvOptions: nearestCCTVs.map(cctv => ({
-                                id: cctv.id,
-                                title: cctv.title,
-                                distance: formatDistance(cctv.distance),
-                                gps: `${cctv.latitude?.toFixed(4)}, ${cctv.longitude?.toFixed(4)}`
-                            }))
-                        } as any]);
+                        const locationInfo = ` (${region.type})`;
+
+                        if (nearestCCTVs.length > 0) {
+                            setMessages(prev => [...prev, {
+                                role: 'ai',
+                                content: `📍 **${locationQuery}**${locationInfo} 주변의 가장 가까운 실시간 CCTV ${nearestCCTVs.length}개를 찾았습니다:\n\n🎯 **원하는 CCTV를 선택하면 실시간 영상과 날씨 정보를 확인할 수 있습니다:**`,
+                                cctvOptions: nearestCCTVs.map(cctv => ({
+                                    id: cctv.id,
+                                    title: cctv.title,
+                                    distance: formatDistance(cctv.distance),
+                                    gps: `${cctv.latitude?.toFixed(4)}, ${cctv.longitude?.toFixed(4)}`
+                                }))
+                            } as any]);
+                        } else {
+                            setMessages(prev => [...prev, {
+                                role: 'ai',
+                                content: `📍 **${locationQuery}**${locationInfo}을 찾았지만, 주변에 등록된 CCTV가 없습니다. 다른 지역을 시도해보세요.`
+                            }]);
+                        }
                     } else {
                         setMessages(prev => [...prev, {
                             role: 'ai',
-                            content: `죄송합니다. ${locationQuery} 주변에 등록된 CCTV를 찾을 수 없습니다. CCTV에 GPS 좌표가 설정되지 않았을 수 있습니다.`
+                            content: `죄송합니다. "${locationQuery}"라는 지역을 찾을 수 없습니다. 제주도의 정확한 행정구역명, 오름명, 또는 관광지명을 사용해주세요.`
                         }]);
 
                         // 하드코딩된 데이터에 없으면 AI에게 시도 (기존 로직)
@@ -519,41 +532,38 @@ ${currentInput}
                             const weatherCardData: WeatherCardData = {
                                 status: 'analyzing',
                                 sourceTitle: source.title,
-                                imageUrl: 'https://i.imgur.com/gT3gA2t.png', // 임시, 실제 캡처 후 교체
-                                youtubeUrl: source.youtubeUrl, // 유튜브 URL 추가
-                                weatherData: {
-                                    temp: '분석중...',
-                                    humidity: '분석중...',
-                                    wind: '분석중...'
-                                }
+                                youtubeUrl: source.youtubeUrl
                             };
                             updatedMessages.push({ role: 'ai', content: '', weatherCard: weatherCardData });
                             return updatedMessages;
                         });
 
-                        // 백그라운드에서 실제 YouTube 캡처 시작
-                        captureWeatherScene(source.youtubeUrl, source.title).then(captureResult => {
-                            if (captureResult) {
-                                // 캡처 완료 후 WeatherCard 데이터 업데이트
-                                setMessages(prev => {
-                                    const updated = [...prev];
-                                    const cardMessage = updated[updated.length - 1];
-                                    if (cardMessage.weatherCard) {
-                                        cardMessage.weatherCard.imageUrl = captureResult.imageUrl;
-                                        cardMessage.weatherCard.weatherData = {
-                                            temp: captureResult.weatherData ? captureResult.weatherData.temp : '정보없음',
-                                            humidity: captureResult.weatherData ? captureResult.weatherData.humidity : '정보없음',
-                                            wind: captureResult.weatherData ? captureResult.weatherData.wind : '정보없음',
-                                            weather: captureResult.weatherData ? captureResult.weatherData.weather : '정보없음',
-                                            location: captureResult.weatherData ? captureResult.weatherData.location : '정보없음'
-                                        };
-                                    }
-                                    return updated;
-                                });
-                            }
-                        }).catch(error => {
-                            console.error('YouTube 캡처 실패:', error);
-                        });
+                        // GPS 연동과 동일한 캡처 로직 사용
+                        captureWeatherScene(source.youtubeUrl, source.title)
+                            .then(result => {
+                                // WeatherCard 업데이트 (GPS 연동과 동일)
+                                setMessages(prev =>
+                                  prev.map(msg =>
+                                    msg.weatherCard && msg.weatherCard.sourceTitle === source.title
+                                      ? { ...msg, weatherCard: { ...result, youtubeUrl: source.youtubeUrl } }
+                                      : msg
+                                  )
+                                );
+                            })
+                            .catch(error => {
+                                console.error('날씨 캡처 실패:', error);
+                                setMessages(prev =>
+                                  prev.map(msg =>
+                                    msg.weatherCard && msg.weatherCard.sourceTitle === source.title
+                                      ? {
+                                          ...msg,
+                                          content: `❌ ${source.title} 영상 분석에 실패했습니다. 다른 지역을 시도해보세요.`,
+                                          weatherCard: undefined
+                                        }
+                                      : msg
+                                  )
+                                );
+                            });
                     } else {
                         // 매칭되는 소스를 찾지 못한 경우
                         setMessages(prev => {

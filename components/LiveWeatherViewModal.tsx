@@ -1,20 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { WeatherSource } from '../types';
 import Modal from './common/Modal';
-import Hls from 'hls.js';
+import HLSVideoPlayer from './HLSVideoPlayer';
 
 // Helper to detect video type
-const getVideoType = (url: string): 'youtube' | 'hls' | 'unknown' => {
+const getVideoType = (url: string, title: string): 'youtube' | 'hls' | 'newWindow' => {
   try {
     const urlObj = new URL(url);
+
+    // 유튜브는 모달에서 재생
     if (urlObj.hostname === 'www.youtube.com' || urlObj.hostname === 'youtube.com' || urlObj.hostname === 'youtu.be') {
       return 'youtube';
-    } else if (url.includes('.m3u8') || url.includes('playlist.m3u8')) {
+    }
+
+    // play.m3u8로 끝나는 것은 HLS로 모달에서 재생
+    if (url.endsWith('play.m3u8')) {
       return 'hls';
     }
-    return 'unknown';
+
+    // playlist.m3u8로 끝나는 것은 새창으로 띄우기
+    if (url.endsWith('playlist.m3u8')) {
+      return 'newWindow';
+    }
+
+    // 나머지는 모두 새창
+    return 'newWindow';
   } catch (error) {
-    return 'unknown';
+    return 'newWindow';
   }
 };
 
@@ -43,9 +55,9 @@ const truncate = (text: string, length: number): string => {
 
 // Helper to convert URLs to use HLS proxy for HTTPS compatibility
 const convertToProxyUrl = (url: string): string => {
-  // 모든 m3u8 URL을 프록시로 처리 (HTTP든 HTTPS든 상관없이)
+  // 모든 m3u8 URL을 자체 프록시로 처리
   if (url.includes('.m3u8')) {
-    return `https://hls-proxy-server-wjbh.vercel.app/proxy-hls?url=${encodeURIComponent(url)}`;
+    return `/api/proxy/hls?url=${encodeURIComponent(url)}`;
   }
   return url;
 };
@@ -171,7 +183,7 @@ const LiveWeatherViewModal: React.FC<LiveWeatherViewModalProps> = ({ isOpen, onC
     }
   }, [selectedRegion]); // filteredSources와 activeSource 제거
 
-  const videoType = activeSource ? getVideoType(activeSource.youtubeUrl) : 'unknown';
+  const videoType = activeSource ? getVideoType(activeSource.youtubeUrl, activeSource.title) : 'newWindow';
   const embedUrl = activeSource && videoType === 'youtube' ? getYouTubeEmbedUrl(activeSource.youtubeUrl) : null;
 
   return (
@@ -214,6 +226,12 @@ const LiveWeatherViewModal: React.FC<LiveWeatherViewModalProps> = ({ isOpen, onC
                       allowFullScreen
                     ></iframe>
                   ) : videoType === 'hls' && activeSource ? (
+                    <HLSVideoPlayer
+                      src={activeSource.youtubeUrl}
+                      title={activeSource.title}
+                      autoPlay={true}
+                    />
+                  ) : videoType === 'newWindow' && activeSource ? (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white">
                       <div className="text-center mb-4">
                         <h3 className="text-lg font-semibold mb-2">{activeSource.title}</h3>
@@ -223,89 +241,7 @@ const LiveWeatherViewModal: React.FC<LiveWeatherViewModalProps> = ({ isOpen, onC
                       </div>
                       <button
                         onClick={() => {
-                          // 새창 열고 HTTP 페이지로 직접 이동
-                          const screenWidth = window.screen.width;
-                          const screenHeight = window.screen.height;
-                          const windowWidth = Math.min(1400, screenWidth * 0.9);
-                          const windowHeight = Math.min(900, screenHeight * 0.9);
-                          const left = (screenWidth - windowWidth) / 2;
-                          const top = (screenHeight - windowHeight) / 2;
-
-                          const newWindow = window.open(
-                            'about:blank',
-                            '_blank',
-                            `width=${windowWidth},height=${windowHeight},left=${left},top=${top},resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no`
-                          );
-
-                          if (newWindow) {
-                            // 새창에 HTML 작성 (닫기 버튼 + HTTP iframe)
-                            newWindow.document.write(`
-                              <!DOCTYPE html>
-                              <html>
-                                <head>
-                                  <title>${activeSource.title}</title>
-                                  <meta charset="utf-8">
-                                  <style>
-                                    * { margin: 0; padding: 0; box-sizing: border-box; }
-                                    body { background: black; overflow: hidden; font-family: Arial, sans-serif; }
-                                    .close-btn {
-                                      position: fixed;
-                                      top: 16px;
-                                      right: 16px;
-                                      z-index: 9999;
-                                      background: rgba(0, 0, 0, 0.8);
-                                      color: white;
-                                      border: none;
-                                      padding: 12px 20px;
-                                      border-radius: 8px;
-                                      cursor: pointer;
-                                      font-size: 16px;
-                                      font-weight: bold;
-                                      backdrop-filter: blur(10px);
-                                      transition: all 0.2s;
-                                    }
-                                    .close-btn:hover {
-                                      background: rgba(220, 38, 38, 0.9);
-                                      transform: scale(1.05);
-                                    }
-                                    .title {
-                                      position: fixed;
-                                      top: 16px;
-                                      left: 16px;
-                                      z-index: 9998;
-                                      background: rgba(0, 0, 0, 0.8);
-                                      color: white;
-                                      padding: 12px 20px;
-                                      border-radius: 8px;
-                                      font-size: 18px;
-                                      font-weight: bold;
-                                      backdrop-filter: blur(10px);
-                                      max-width: calc(100% - 180px);
-                                      white-space: nowrap;
-                                      overflow: hidden;
-                                      text-overflow: ellipsis;
-                                    }
-                                    iframe {
-                                      width: 100vw;
-                                      height: 100vh;
-                                      border: none;
-                                    }
-                                  </style>
-                                </head>
-                                <body>
-                                  <button class="close-btn" onclick="window.close()">✕ 닫기</button>
-                                  <div class="title">${activeSource.title}</div>
-                                  <iframe src="${activeSource.youtubeUrl}" allow="autoplay; fullscreen; camera; microphone" allowfullscreen></iframe>
-                                </body>
-                              </html>
-                            `);
-                            newWindow.document.close();
-
-                            // HTTP로 직접 이동
-                            setTimeout(() => {
-                              newWindow.location.href = activeSource.youtubeUrl;
-                            }, 100);
-                          }
+                          window.open(activeSource.youtubeUrl, '_blank');
                         }}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
                       >
@@ -313,7 +249,7 @@ const LiveWeatherViewModal: React.FC<LiveWeatherViewModalProps> = ({ isOpen, onC
                       </button>
                     </div>
                   ) : (
-                    <p className="text-white flex items-center justify-center h-full">지원되지 않는 영상 형식입니다.</p>
+                    <p className="text-white flex items-center justify-center h-full">영상 소스를 선택해주세요.</p>
                   )}
                 </div>
                 <p className="text-center text-sm text-gray-600 mt-2 font-semibold">{activeSource.title}</p>

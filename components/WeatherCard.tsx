@@ -64,11 +64,37 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialData, onComplete, skip
 
   if (status !== 'done') {
     return (
-      <div className="p-4 bg-white border rounded-lg shadow-sm flex items-center space-x-3 animate-pulse">
-        <Spinner />
-        <div>
-            <p className="font-semibold text-gray-800">{initialData.sourceTitle}</p>
-            <p className="text-sm text-gray-600">{statusMessages[status]}</p>
+      <div className="p-3 bg-white border rounded-lg shadow-sm">
+        <h4 className="font-bold text-gray-800 mb-2">{initialData.sourceTitle} 실시간 날씨</h4>
+
+        {/* 로딩 중에도 재생버튼이 있는 썸네일 표시 */}
+        <div className="relative rounded-lg overflow-hidden mb-3">
+          <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
+            <div className="text-center">
+              <Spinner />
+              <p className="text-sm text-gray-600 mt-2">{statusMessages[status]}</p>
+            </div>
+          </div>
+
+          {/* 로딩 중에도 재생버튼 표시 */}
+          {initialData.youtubeUrl && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <button
+                onClick={() => setIsVideoModalOpen(true)}
+                className="bg-red-600 bg-opacity-50 hover:bg-opacity-70 text-white rounded-full p-6 shadow-xl transition-all duration-200 transform hover:scale-110"
+                title="실시간 영상 재생"
+              >
+                <svg className="w-12 h-12 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Spinner />
+          <p className="text-sm text-gray-600">{statusMessages[status]}</p>
         </div>
       </div>
     );
