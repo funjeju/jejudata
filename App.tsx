@@ -8,6 +8,7 @@ import SpotDetailView from './components/SpotDetailView';
 import Chatbot from './components/Chatbot';
 import WeatherChatModal from './components/WeatherChatModal';
 import TripPlannerModal from './components/TripPlannerModal';
+import OroomDBModal from './components/OroomDBModal';
 import VideoViewer from './components/VideoViewer';
 import Spinner from './components/common/Spinner';
 import Modal from './components/common/Modal';
@@ -60,6 +61,7 @@ const App: React.FC = () => {
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   const [isWeatherChatOpen, setIsWeatherChatOpen] = useState(false);
   const [isTripPlannerOpen, setIsTripPlannerOpen] = useState(false);
+  const [isOroomDBOpen, setIsOroomDBOpen] = useState(false);
   const [weatherSources, setWeatherSources] = useState<WeatherSource[]>([]);
   const [isLoadingSpots, setIsLoadingSpots] = useState(true);
 // 스팟 데이터 실시간 리스너
@@ -620,6 +622,7 @@ const App: React.FC = () => {
                   onDelete={handleDeleteSpot}
                   onOpenWeatherChat={() => setIsWeatherChatOpen(true)}
                   onOpenTripPlanner={() => setIsTripPlannerOpen(true)}
+                  onOpenOroomDB={() => setIsOroomDBOpen(true)}
                 />;
       case 'view':
         if (spotToView) {
@@ -682,7 +685,7 @@ const App: React.FC = () => {
             <div className="flex items-center space-x-3">
                 <KLokalLogo />
                 <h1 className="text-3xl font-bold text-gray-800 tracking-tight">
-                    K-LOKAL: AI 데이터빌더
+                    Jeju DB: AI 데이터빌더
                 </h1>
             </div>
             {HeaderButton}
@@ -691,7 +694,7 @@ const App: React.FC = () => {
           {renderContent()}
         </main>
         <footer className="text-center mt-12 text-sm text-gray-500">
-          <p>&copy; {new Date().getFullYear()} K-LOKAL Project. All Rights Reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Jeju DB Project. All Rights Reserved.</p>
         </footer>
       </div>
       
@@ -757,6 +760,11 @@ const App: React.FC = () => {
           isOpen={isTripPlannerOpen}
           onClose={() => setIsTripPlannerOpen(false)}
           spots={spots}
+        />
+
+        <OroomDBModal
+          isOpen={isOroomDBOpen}
+          onClose={() => setIsOroomDBOpen(false)}
         />
     </div>
   );

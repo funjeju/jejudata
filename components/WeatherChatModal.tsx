@@ -34,24 +34,49 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Utility to convert image URL to a base64 part for Gemini API
 async function urlToGenerativePart(url: string) {
-  const response = await fetch(url);
-  const blob = await response.blob();
-  const mimeType = blob.type;
-  if (!mimeType.startsWith('image/')) {
-    throw new Error('URL does not point to a valid image.');
-  }
-  const base64 = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-  return {
-    inlineData: {
-      mimeType,
-      data: base64
+  try {
+    // data URL인지 확인 (Canvas에서 생성된 이미지)
+    if (url.startsWith('data:image/')) {
+      const [header, base64Data] = url.split(',');
+      const mimeType = header.match(/data:([^;]+)/)?.[1] || 'image/png';
+
+      return {
+        inlineData: {
+          mimeType,
+          data: base64Data
+        }
+      };
     }
-  };
+
+    // 일반 URL인 경우 fetch 사용
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const blob = await response.blob();
+    const mimeType = blob.type;
+    if (!mimeType.startsWith('image/')) {
+      throw new Error(`Invalid image type: ${mimeType}`);
+    }
+
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
+    return {
+      inlineData: {
+        mimeType,
+        data: base64
+      }
+    };
+  } catch (error) {
+    console.error('이미지 변환 오류:', error);
+    throw new Error(`이미지 처리 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+  }
 }
 
 interface Message {
@@ -619,6 +644,9 @@ ${currentInput}
       return newMessages;
     });
 
+    // WeatherCard 완료 후 2초 대기하여 사용자가 결과를 확인할 수 있도록 함
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     setIsLoading(true);
     setMessages(prev => [...prev, { role: 'ai', content: '' }]);
 
@@ -676,12 +704,28 @@ ${weatherInfo}
             });
         }
     } catch (error) {
-        console.error("Image analysis error:", error);
+        console.error("브리핑 생성 오류:", error);
+        const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
+        console.error("상세 오류 정보:", errorMessage);
+
          setMessages(prev => {
             const newMessages = [...prev];
             const lastMessage = newMessages[newMessages.length - 1];
             if (lastMessage && lastMessage.role === 'ai') {
-                lastMessage.content = '죄송합니다, 이미지 분석 중 오류가 발생했습니다.';
+                lastMessage.content = `🌤️ **현재 날씨 상황**
+- 실시간 영상을 통해 현재 ${source.sourceTitle} 지역의 날씨를 확인할 수 있습니다.
+
+📊 **기상 데이터**
+${source.weatherData ? `
+- 현재 기온: ${source.weatherData.temp}
+- 습도: ${source.weatherData.humidity}
+- 풍속: ${source.weatherData.wind}
+
+기상청 공식 관측소 데이터입니다.
+` : '기상청 데이터를 가져올 수 없었습니다.'}
+
+💡 **참고 사항**
+- AI 분석은 일시적으로 이용할 수 없지만, 실시간 영상과 기상 데이터는 정상 제공됩니다.`;
             }
             return newMessages;
         });

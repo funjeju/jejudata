@@ -74,6 +74,11 @@ export async function getCurrentWeather(location: keyof typeof JEJU_WEATHER_STAT
     return getFallbackWeatherData(name);
   }
 
+  // 3초 타임아웃 설정
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('API 호출 타임아웃')), 3000);
+  });
+
   const params = new URLSearchParams({
     serviceKey: API_KEY,
     numOfRows: '10',
@@ -89,12 +94,14 @@ export async function getCurrentWeather(location: keyof typeof JEJU_WEATHER_STAT
   console.log('기상청 API 요청:', url);
 
   try {
-    const response = await fetch(url, {
+    const apiCallPromise = fetch(url, {
       method: 'GET',
       headers: {
         'Accept': 'application/json'
       }
     });
+
+    const response = await Promise.race([apiCallPromise, timeoutPromise]);
 
     if (!response.ok) {
       console.error('HTTP 오류:', response.status, response.statusText);
@@ -144,7 +151,8 @@ export async function getCurrentWeather(location: keyof typeof JEJU_WEATHER_STAT
     };
 
   } catch (error) {
-    console.error('기상 데이터 가져오기 실패:', error);
+    console.error('기상 데이터 가져오기 실패 (3초 타임아웃 또는 API 오류):', error);
+    console.log('폴백 데이터 사용:', name);
     return getFallbackWeatherData(name);
   }
 }

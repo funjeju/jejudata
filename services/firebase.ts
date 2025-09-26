@@ -1,6 +1,7 @@
 // src/firebase.ts (or services/firebase.ts)
 import { initializeApp } from "firebase/app";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // Firebase 프로젝트 설정 (Firebase 콘솔에서 가져오기)
 const firebaseConfig = {
@@ -19,9 +20,12 @@ const app = initializeApp(firebaseConfig);
 // Firestore 인스턴스 생성 (databuilder 데이터베이스 사용)
 const db = getFirestore(app, "databuilder");
 
+// Firebase Storage 인스턴스 생성
+const storage = getStorage(app);
+
 // 개발 모드에서 에뮬레이터 사용 (선택사항)
 // if (location.hostname === 'localhost') {
 //   connectFirestoreEmulator(db, 'localhost', 8080);
 // }
 
-export { db };
+export { db, storage };

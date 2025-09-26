@@ -127,3 +127,43 @@ export interface WeatherCardData {
     wind: string;
   };
 }
+
+// 오름 관련 타입들
+export interface OroomImage {
+  id: string;
+  url: string;
+  file?: File;
+  description?: string;
+}
+
+export interface OroomData {
+  id: string;
+  name: string; // 오름이름
+  address: string; // 주소
+  latitude?: number; // GPS 위도
+  longitude?: number; // GPS 경도
+  difficulty: '쉬움' | '보통' | '어려움' | '매우어려움'; // 난이도
+  mainSeasons: string[]; // 주요계절
+  mainMonths: string[]; // 주요월
+  roundTripTime: string; // 왕복소요시간
+  summitView: '상' | '중' | '하'; // 정상뷰
+  expertTip: string; // 전문가 팁 (등반 팁, 주의사항 등)
+  nearbyAttractions: string[]; // 주변 가볼만한곳
+  nameOrigin: string; // 이름유래
+
+  // 사진 관련
+  parkingImages: OroomImage[]; // 주차장 (최대 3장)
+  entranceImages: OroomImage[]; // 탐방로입구 (최대 3장)
+  trailImages: OroomImage[]; // 탐방로 (최대 5장)
+  summitImages: OroomImage[]; // 정상뷰 (최대 3장)
+  summitVideoUrl?: string; // 정상뷰 유튜브 영상
+
+  // 메타데이터
+  createdAt: Date;
+  updatedAt: Date;
+  status: 'draft' | 'published';
+}
+
+export interface OroomInitialFormData {
+  description: string; // AI가 분석할 오름 설명 텍스트
+}

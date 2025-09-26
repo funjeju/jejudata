@@ -52,6 +52,13 @@ const HLSVideoPlayer: React.FC<HLSVideoPlayerProps> = ({
             // CODECS 우선순위 설정
             abrEwmaDefaultEstimate: 500000,
             enableWorker: true,
+            // 에러 허용도 높이기
+            fragLoadingTimeOut: 20000,
+            manifestLoadingTimeOut: 10000,
+            fragLoadingMaxRetry: 6,
+            // 트랜스먹싱 설정
+            forceKeyFrameOnDiscontinuity: true,
+            ignoreDevicePixelRatio: true,
           });
 
           hlsRef.current = hls;

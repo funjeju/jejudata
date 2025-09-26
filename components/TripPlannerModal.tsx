@@ -652,7 +652,7 @@ Based on the user's detailed profile and the provided spot data, create a compre
           <main className="flex-1 p-2 overflow-y-auto bg-gray-100 rounded-lg">
              <div className="p-4 printable-itinerary">
                 <div className="text-center mb-8">
-                    <h2 className="text-3xl font-extrabold text-gray-900">K-LOKAL 맞춤 제주 여행</h2>
+                    <h2 className="text-3xl font-extrabold text-gray-900">Jeju DB 맞춤 제주 여행</h2>
                     <p className="text-gray-500 mt-2">당신만을 위해 AI가 생성한 특별한 여행 계획입니다.</p>
                 </div>
                 <FormattedMessageContent content={finalItinerary || ''} />

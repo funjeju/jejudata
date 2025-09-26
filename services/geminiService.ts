@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import type { InitialFormData, Place } from '../types';
+import type { InitialFormData, Place, OroomInitialFormData, OroomData } from '../types';
 
 // The API key is sourced from the environment variable `process.env.API_KEY`.
 // It is assumed to be pre-configured and accessible in the execution environment.
@@ -84,7 +84,7 @@ const draftGenerationSchema = {
 export const generateDraft = async (formData: InitialFormData): Promise<Partial<Place>> => {
     const prompt = `
 # ROLE & GOAL
-You are an AI data assistant for K-LOKAL, a Jeju travel platform. Your goal is to create a structured JSON data draft for a travel spot. You will use a mandatory expert description as the primary source of truth, and an optional URL for supplementary, objective information.
+You are an AI data assistant for Jeju DB, a Jeju travel platform. Your goal is to create a structured JSON data draft for a travel spot. You will use a mandatory expert description as the primary source of truth, and an optional URL for supplementary, objective information.
 
 # INPUTS
 1.  **Spot Name**: "${formData.spotName}"
@@ -128,5 +128,105 @@ You are an AI data assistant for K-LOKAL, a Jeju travel platform. Your goal is t
     } catch (error) {
         console.error("Error generating draft from AI:", error);
         throw new Error("Failed to generate AI draft. Please check the console for details.");
+    }
+};
+
+const oroomAnalysisSchema = {
+    type: Type.OBJECT,
+    properties: {
+        name: { type: Type.STRING, description: "오름의 정확한 이름" },
+        address: { type: Type.STRING, description: "오름의 정확한 주소" },
+        difficulty: {
+            type: Type.STRING,
+            description: "난이도: '쉬움', '보통', '어려움', '매우어려움' 중 하나",
+            enum: ['쉬움', '보통', '어려움', '매우어려움']
+        },
+        mainSeasons: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "주요 계절: '봄', '여름', '가을', '겨울' 중 선택"
+        },
+        mainMonths: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "주요 월: '1월', '2월', ... '12월' 형태로"
+        },
+        roundTripTime: { type: Type.STRING, description: "왕복 소요 시간 (예: '왕복 2시간')" },
+        summitView: {
+            type: Type.STRING,
+            description: "정상뷰 등급: '상', '중', '하' 중 하나",
+            enum: ['상', '중', '하']
+        },
+        expertTip: { type: Type.STRING, description: "오름 등반 시 전문가 팁, 주의사항, 추천 코스 등" },
+        nearbyAttractions: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "주변 관광지나 가볼만한 곳들"
+        },
+        nameOrigin: { type: Type.STRING, description: "오름 이름의 유래나 의미" }
+    },
+    required: ["name", "address", "difficulty", "roundTripTime", "summitView"]
+};
+
+export const analyzeOroomDescription = async (formData: OroomInitialFormData): Promise<Partial<OroomData>> => {
+    const prompt = `
+# ROLE & GOAL
+당신은 제주도 오름 전문가입니다. 사용자가 제공한 오름 설명을 분석하여 구조화된 데이터로 변환해주세요.
+
+# INPUT
+오름 설명:
+"""
+${formData.description}
+"""
+
+# INSTRUCTIONS
+1. **오름 이름**: 설명에서 오름의 정확한 이름을 추출하세요
+2. **주소**: 오름이 위치한 정확한 주소를 추출하세요 (제주특별자치도 포함)
+3. **난이도**: 설명을 바탕으로 등반 난이도를 판단하세요 ('쉬움', '보통', '어려움', '매우어려움')
+4. **주요 계절**: 방문하기 좋은 계절을 추천하세요 ('봄', '여름', '가을', '겨울')
+5. **주요 월**: 가장 좋은 방문 월을 선택하세요 ('4월', '5월' 등)
+6. **왕복 소요 시간**: 평균적인 왕복 소요 시간을 추정하세요 ('왕복 1시간' 형식)
+7. **정상뷰**: 정상에서의 경치 수준을 평가하세요 ('상', '중', '하')
+8. **전문가 팁**: 등반 시 주의사항, 추천 코스, 준비물, 날씨별 팁 등을 자세히 설명하세요
+9. **주변 관광지**: 오름 근처의 관광지나 명소들을 나열하세요
+10. **이름 유래**: 오름 이름의 유래나 의미를 설명하세요
+
+# OUTPUT
+JSON 형태로만 반환하세요. 추가 설명이나 마크다운 없이 순수한 JSON만 출력하세요.
+`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: oroomAnalysisSchema,
+            },
+        });
+
+        const jsonText = response.text.trim();
+        if (!jsonText) {
+            throw new Error("AI에서 응답을 받지 못했습니다.");
+        }
+
+        const analysisResult = JSON.parse(jsonText);
+
+        // 현재 시간으로 메타데이터 추가
+        return {
+            ...analysisResult,
+            id: Date.now().toString(),
+            parkingImages: [],
+            entranceImages: [],
+            trailImages: [],
+            summitImages: [],
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            status: 'draft' as const
+        };
+
+    } catch (error) {
+        console.error("오름 분석 오류:", error);
+        throw new Error("AI 오름 분석에 실패했습니다. 콘솔을 확인해주세요.");
     }
 };

@@ -16,6 +16,7 @@ interface ContentLibraryProps {
   onDelete: (spot: Place) => void;
   onOpenWeatherChat: () => void;
   onOpenTripPlanner: () => void;
+  onOpenOroomDB?: () => void;
 }
 
 const STATUS_OPTIONS = ['draft', 'published', 'rejected', 'stub'];
@@ -47,7 +48,7 @@ const StatusBadge: React.FC<{ status: Place['status']; onClick?: () => void }> =
 };
 
 
-const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit, onView, onDelete, onOpenWeatherChat, onOpenTripPlanner }) => {
+const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit, onView, onDelete, onOpenWeatherChat, onOpenTripPlanner, onOpenOroomDB }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -163,6 +164,12 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
                 className="bg-sky-500 text-white hover:bg-sky-600 focus:ring-sky-400"
             >
                 🌦️ 실시간 날씨 챗톡
+            </Button>
+            <Button
+                onClick={() => onOpenOroomDB && onOpenOroomDB()}
+                className="bg-green-500 text-white hover:bg-green-600 focus:ring-green-400"
+            >
+                🏔️ 오름DB
             </Button>
             
             <div className="flex items-center gap-2 border-l border-gray-300 pl-4 ml-2">

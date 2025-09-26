@@ -165,7 +165,15 @@ async function captureYouTubeThumbnail(youtubeUrl: string, sourceTitle: string):
         const img = new Image();
         img.crossOrigin = 'anonymous';
 
+        // 이미지 로딩 타임아웃 (5초)
+        const timeout = setTimeout(() => {
+          console.log(`썸네일 로딩 타임아웃: ${thumbnailUrl}`);
+          currentIndex++;
+          tryNextThumbnail();
+        }, 5000);
+
         img.onload = () => {
+          clearTimeout(timeout);
           console.log(`썸네일 로드 성공: ${thumbnailUrl}`);
 
           // Canvas 크기 설정
@@ -202,6 +210,7 @@ async function captureYouTubeThumbnail(youtubeUrl: string, sourceTitle: string):
         };
 
         img.onerror = () => {
+          clearTimeout(timeout);
           console.warn(`썸네일 로드 실패: ${thumbnailUrl}, 다음 시도...`);
           currentIndex++;
           tryNextThumbnail();
@@ -312,22 +321,31 @@ export async function captureWeatherScene(youtubeUrl: string, sourceTitle: strin
   console.log(`날씨 장면 캡처 시작: ${sourceTitle}`);
 
   try {
-    // 지역에 맞는 기상 데이터 가져오기
+    // 지역에 맞는 기상 데이터 가져오기 (병렬 처리)
     const station = getWeatherStationFromTitle(sourceTitle);
-    const rawWeatherData = await getCurrentWeather(station);
-    const transformedWeatherData = transformWeatherData(rawWeatherData);
+
+    // 기상 데이터와 썸네일을 병렬로 가져오기
+    const [rawWeatherData, thumbnailResult] = await Promise.allSettled([
+      getCurrentWeather(station),
+      captureYouTubeThumbnail(youtubeUrl, sourceTitle)
+    ]);
+
+    const transformedWeatherData = rawWeatherData.status === 'fulfilled' && rawWeatherData.value
+      ? transformWeatherData(rawWeatherData.value)
+      : null;
 
     console.log(`${station} 관측소 데이터:`, rawWeatherData);
 
-    // YouTube 캡처 (현재는 썸네일 사용, 추후 실시간 스트림 캡처로 변경)
-    const result = await captureYouTubeThumbnail(youtubeUrl, sourceTitle);
-
-    if (result) {
+    // 썸네일 결과 처리
+    if (thumbnailResult.status === 'fulfilled' && thumbnailResult.value) {
+      const result = thumbnailResult.value;
       result.weatherData = transformedWeatherData; // 최신 기상 데이터로 업데이트
-      console.log('캡처 완료:', result.timestamp);
+      console.log('✅ 날씨 장면 캡처 완료 (병렬 처리):', result.timestamp);
+      return result;
     }
 
-    return result;
+    console.error('썸네일 캡처 실패');
+    return null;
   } catch (error) {
     console.error('날씨 장면 캡처 실패:', error);
     return null;

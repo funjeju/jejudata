@@ -43,7 +43,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
             model: 'gemini-2.5-flash',
             config: {
                 systemInstruction: `
-                    You are a friendly and helpful conversational assistant for K-LOKAL, a Jeju travel platform. Your name is 'K-LOKAL AI 어시스턴트'.
+                    You are a friendly and helpful conversational assistant for Jeju DB, a Jeju travel platform. Your name is 'Jeju DB AI 어시스턴트'.
                     - Your answers MUST be in Korean.
                     - Engage in natural, general conversation.
                     - CRITICAL RULE: If a user's request for a recommendation is too vague or lacks context (e.g., "오름 추천해줘", "카페 찾아줘"), you MUST ask a clarifying question to get more information. DO NOT recommend anything until you have enough context. Good clarifying questions are like "물론이죠! 혹시 찾으시는 특정 지역이 있으신가요?" or "어떤 분위기의 카페를 원하세요?".
@@ -83,7 +83,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
         });
         setChat(newChat);
         setMessages([
-            { role: 'ai', content: '안녕하세요! K-LOKAL AI 어시스턴트입니다. 라이브러리에 저장된 스팟 정보에 대해 무엇이든 물어보세요.' }
+            { role: 'ai', content: '안녕하세요! Jeju DB AI 어시스턴트입니다. 라이브러리에 저장된 스팟 정보에 대해 무엇이든 물어보세요.' }
         ]);
     }
   }, [isOpen, chat]);
@@ -178,7 +178,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
   return (
     <div className="fixed bottom-24 right-6 w-[90vw] max-w-md h-[70vh] max-h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col z-50 transition-transform transform-gpu">
       <header className="flex items-center justify-between p-4 border-b bg-gray-50 rounded-t-2xl">
-        <h3 className="text-lg font-bold text-gray-800">K-LOKAL AI 어시스턴트</h3>
+        <h3 className="text-lg font-bold text-gray-800">Jeju DB AI 어시스턴트</h3>
         <button onClick={onClose} className="text-gray-500 hover:text-gray-800" aria-label="Close chat">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>

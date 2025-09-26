@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { WeatherSource } from '../types';
 import Modal from './common/Modal';
 import HLSVideoPlayer from './HLSVideoPlayer';
+import VideoJSPlayer from './VideoJSPlayer';
 
 // Helper to detect video type
 const getVideoType = (url: string, title: string): 'youtube' | 'hls' | 'newWindow' => {
@@ -13,9 +14,9 @@ const getVideoType = (url: string, title: string): 'youtube' | 'hls' | 'newWindo
       return 'youtube';
     }
 
-    // play.m3u8로 끝나는 것은 HLS로 모달에서 재생
+    // play.m3u8로 끝나는 것은 새창에서 플레이어 페이지로 재생
     if (url.endsWith('play.m3u8')) {
-      return 'hls';
+      return 'newWindow';
     }
 
     // playlist.m3u8로 끝나는 것은 새창으로 띄우기
@@ -226,7 +227,7 @@ const LiveWeatherViewModal: React.FC<LiveWeatherViewModalProps> = ({ isOpen, onC
                       allowFullScreen
                     ></iframe>
                   ) : videoType === 'hls' && activeSource ? (
-                    <HLSVideoPlayer
+                    <VideoJSPlayer
                       src={activeSource.youtubeUrl}
                       title={activeSource.title}
                       autoPlay={true}
@@ -241,7 +242,15 @@ const LiveWeatherViewModal: React.FC<LiveWeatherViewModalProps> = ({ isOpen, onC
                       </div>
                       <button
                         onClick={() => {
-                          window.open(activeSource.youtubeUrl, '_blank');
+                          const videoType = getVideoType(activeSource.youtubeUrl, activeSource.title);
+                          if (videoType === 'newWindow' && activeSource.youtubeUrl.endsWith('play.m3u8')) {
+                            // HLS 스트림은 플레이어 페이지에서 열기
+                            const playerUrl = `/player.html?url=${encodeURIComponent(activeSource.youtubeUrl)}&title=${encodeURIComponent(activeSource.title)}`;
+                            window.open(playerUrl, '_blank', 'width=1320,height=800');
+                          } else {
+                            // 기존 방식으로 직접 열기
+                            window.open(activeSource.youtubeUrl, '_blank');
+                          }
                         }}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
                       >

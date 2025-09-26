@@ -80,7 +80,15 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialData, onComplete, skip
           {initialData.youtubeUrl && (
             <div className="absolute inset-0 flex items-center justify-center">
               <button
-                onClick={() => setIsVideoModalOpen(true)}
+                onClick={() => {
+                  // play.m3u8는 바로 새창으로, 나머지는 모달로
+                  if (initialData.youtubeUrl && initialData.youtubeUrl.endsWith('play.m3u8')) {
+                    const playerUrl = `/player.html?url=${encodeURIComponent(initialData.youtubeUrl)}&title=${encodeURIComponent(initialData.title)}`;
+                    window.open(playerUrl, '_blank', 'width=1320,height=800');
+                  } else {
+                    setIsVideoModalOpen(true);
+                  }
+                }}
                 className="bg-red-600 bg-opacity-50 hover:bg-opacity-70 text-white rounded-full p-6 shadow-xl transition-all duration-200 transform hover:scale-110"
                 title="실시간 영상 재생"
               >
