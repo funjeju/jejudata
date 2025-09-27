@@ -157,32 +157,18 @@ const GpsCoordinateModal: React.FC<GpsCoordinateModalProps> = ({ isOpen, onClose
         // Google API 실패 시 제주 지역 데이터로 백업
         console.log('Google API 실패, 제주 지역 데이터 검색 중...');
 
-        // 기존 jejuLocations 검색
-        const foundLocation = findLocationByName(searchQuery);
-        if (foundLocation) {
-          results.push({
-            name: `${foundLocation.name} (${foundLocation.city} ${foundLocation.type})`,
-            latitude: foundLocation.latitude,
-            longitude: foundLocation.longitude,
-            source: 'hardcoded',
-            keywords: [foundLocation.city, foundLocation.type],
-            landmarks: [foundLocation.name]
-          });
-          console.log('제주 지역 백업 데이터 사용:', foundLocation.name);
-        }
-
-        // 새로운 jejuRegions 백업 검색
-        const foundRegion = findRegionByName(searchQuery);
+        // 제주 지역 데이터 백업 검색
+        const foundRegion = await findRegionByName(searchQuery);
         if (foundRegion) {
           results.push({
-            name: `${foundRegion.name} (${foundRegion.area} ${foundRegion.type})`,
+            name: `${foundRegion.name} (${foundRegion.type})`,
             latitude: foundRegion.lat,
             longitude: foundRegion.lng,
-            source: 'jejuRegions',
-            keywords: [foundRegion.area, foundRegion.type],
-            landmarks: foundRegion.landmarks || [foundRegion.name]
+            source: 'hardcoded',
+            keywords: [foundRegion.type],
+            landmarks: [foundRegion.name]
           });
-          console.log('제주 리 단위 백업 데이터 사용:', foundRegion.name);
+          console.log('제주 지역 백업 데이터 사용:', foundRegion.name);
         }
 
         if (results.length === 0) {

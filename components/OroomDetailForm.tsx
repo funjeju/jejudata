@@ -71,6 +71,29 @@ const OroomDetailForm: React.FC<OroomDetailFormProps> = ({ oroomData, onSave, on
     }
   };
 
+  const handleCardImageUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    const categoryKey = 'card_upload';
+    setUploadingImages(prev => [...prev, categoryKey]);
+
+    try {
+      // Firebase Storage에 업로드 (카드 카테고리로)
+      const uploadedImages = await uploadMultipleImages([file], formData.id, 'summit'); // summit 카테고리 재사용
+
+      if (uploadedImages.length > 0) {
+        handleInputChange('cardImage', uploadedImages[0]);
+        console.log('카드 이미지 업로드 완료:', uploadedImages[0]);
+      }
+    } catch (error) {
+      console.error('카드 이미지 업로드 오류:', error);
+      alert(`카드 이미지 업로드 중 오류가 발생했습니다: ${(error as Error).message}`);
+    } finally {
+      setUploadingImages(prev => prev.filter(key => key !== categoryKey));
+    }
+  };
+
   const removeImage = (category: 'parking' | 'entrance' | 'trail' | 'summit', imageId: string) => {
     const fieldName = `${category}Images` as keyof OroomData;
     const currentImages = formData[fieldName] as OroomImage[];
@@ -339,6 +362,61 @@ const OroomDetailForm: React.FC<OroomDetailFormProps> = ({ oroomData, onSave, on
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               rows={3}
             />
+          </div>
+        </div>
+
+        {/* 오름 카드 이미지 섹션 */}
+        <div className="bg-gray-50 rounded-lg p-6 space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">🎴 오름 카드 이미지</h3>
+          <p className="text-sm text-gray-600">세로형 카드 이미지를 업로드하세요. (권장 비율: 2:3 또는 3:4)</p>
+
+          <div className="space-y-3">
+            {/* 현재 카드 이미지 표시 */}
+            {formData.cardImage && (
+              <div className="flex justify-center">
+                <div className="relative">
+                  <img
+                    src={formData.cardImage.url}
+                    alt="오름 카드"
+                    className="w-48 h-64 object-cover rounded-lg border shadow-md"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleInputChange('cardImage', undefined)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 카드 이미지 업로드 */}
+            {!formData.cardImage && (
+              <div>
+                {uploadingImages.includes('card_upload') ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="flex items-center space-x-2 text-blue-600">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      <span className="text-sm">카드 이미지 업로드 중...</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                    <div className="space-y-2">
+                      <div className="text-4xl text-gray-400">🎴</div>
+                      <p className="text-sm text-gray-600">오름 카드 이미지를 업로드하세요</p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleCardImageUpload(e.target.files)}
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

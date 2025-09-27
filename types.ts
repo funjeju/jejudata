@@ -152,6 +152,7 @@ export interface OroomData {
   nameOrigin: string; // 이름유래
 
   // 사진 관련
+  cardImage?: OroomImage; // 오름 카드 이미지 (세로형 카드, 1장)
   parkingImages: OroomImage[]; // 주차장 (최대 3장)
   entranceImages: OroomImage[]; // 탐방로입구 (최대 3장)
   trailImages: OroomImage[]; // 탐방로 (최대 5장)

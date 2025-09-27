@@ -320,43 +320,8 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ spots, orooms = [], onSpo
       });
     });
 
-    // 오름 마커 추가
-    orooms.forEach(oroom => {
-      if (!oroom.latitude || !oroom.longitude) return;
-
-      const position = { lat: oroom.latitude, lng: oroom.longitude };
-      const marker = new window.google.maps.Marker({
-        position: position,
-        map: mapRef.current,
-        title: oroom.name,
-        icon: {
-          path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW, // 삼각형 모양으로 구분
-          fillColor: getCategoryColor('오름'),
-          fillOpacity: 1,
-          strokeColor: 'white',
-          strokeWeight: 2,
-          scale: 10,
-          rotation: 0
-        },
-      });
-
-      markersRef.current.push(marker);
-
-      // 오름 정보창 추가
-      const infoWindow = new window.google.maps.InfoWindow({
-        content: `
-          <div class="p-2">
-            <h3 class="font-semibold text-sm">🏔️ ${oroom.name}</h3>
-            <p class="text-xs text-gray-600">오름 • 난이도: ${oroom.difficulty}</p>
-            <p class="text-xs text-gray-500">${oroom.roundTripTime}</p>
-          </div>
-        `,
-      });
-
-      marker.addListener('click', () => {
-        infoWindow.open(mapRef.current, marker);
-      });
-    });
+    // 오름 마커 추가 (현재 비활성화)
+    // 오름DB 데이터는 별도 관리하므로 지도 연동 패스
   };
 
   return (

@@ -16,6 +16,14 @@ interface OroomDetailViewProps {
 }
 
 const OroomDetailView: React.FC<OroomDetailViewProps> = ({ oroom, onBack, onEdit }) => {
+  const [showGameCardModal, setShowGameCardModal] = React.useState(false);
+  const [showImageModal, setShowImageModal] = React.useState(false);
+  const [selectedImage, setSelectedImage] = React.useState<{ url: string; alt: string } | null>(null);
+  const handleImageClick = (imageUrl: string, imageAlt: string) => {
+    setSelectedImage({ url: imageUrl, alt: imageAlt });
+    setShowImageModal(true);
+  };
+
   const renderImageSection = (
     images: any[],
     title: string,
@@ -32,7 +40,8 @@ const OroomDetailView: React.FC<OroomDetailViewProps> = ({ oroom, onBack, onEdit
                 <img
                   src={image.url}
                   alt={`${title} ${index + 1}`}
-                  className="w-full h-24 object-cover rounded-lg border"
+                  className="w-full h-24 object-cover rounded-lg border cursor-pointer hover:opacity-75 transition-opacity"
+                  onClick={() => handleImageClick(image.url, `${title} ${index + 1}`)}
                 />
               </div>
             ))}
@@ -89,11 +98,31 @@ const OroomDetailView: React.FC<OroomDetailViewProps> = ({ oroom, onBack, onEdit
         </div>
       )}
 
-      {/* 기본 정보 */}
+      {/* 카드 이미지 + 기본 정보 */}
       <div className="bg-gray-50 rounded-lg p-6 space-y-4">
         <h3 className="text-lg font-semibold text-gray-900">기본 정보</h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* 오름게임카드 */}
+          {oroom.cardImage && (
+            <div className="flex-shrink-0">
+              <div
+                className="w-48 h-64 bg-white rounded-lg shadow-md overflow-hidden border cursor-pointer hover:shadow-lg transition-shadow"
+                onClick={() => setShowGameCardModal(true)}
+              >
+                <img
+                  src={oroom.cardImage.url}
+                  alt={`${oroom.name} 오름게임카드`}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <p className="text-sm text-gray-500 text-center mt-2">클릭하여 크게 보기</p>
+            </div>
+          )}
+
+          {/* 기본 정보 그리드 */}
+          <div className="flex-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">주소</label>
             <p className="text-gray-900">{oroom.address}</p>
@@ -175,15 +204,21 @@ const OroomDetailView: React.FC<OroomDetailViewProps> = ({ oroom, onBack, onEdit
             </div>
           </div>
         )}
-
-        {oroom.expertTip && (
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">💡 전문가 팁</label>
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <p className="text-amber-800 text-sm leading-relaxed whitespace-pre-line">{oroom.expertTip}</p>
-            </div>
           </div>
-        )}
+        </div>
+      </div>
+
+      {/* 전문가 팁 */}
+      {oroom.expertTip && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-amber-900 mb-4">💡 전문가 팁</h3>
+          <p className="text-amber-800 leading-relaxed whitespace-pre-line">{oroom.expertTip}</p>
+        </div>
+      )}
+
+      {/* 추가 정보 */}
+      <div className="bg-gray-50 rounded-lg p-6 space-y-4">
+        <h3 className="text-lg font-semibold text-gray-900">추가 정보</h3>
 
         {oroom.nearbyAttractions.length > 0 && (
           <div>
@@ -204,7 +239,6 @@ const OroomDetailView: React.FC<OroomDetailViewProps> = ({ oroom, onBack, onEdit
             <p className="text-gray-900 bg-white p-3 rounded-md border">{oroom.nameOrigin}</p>
           </div>
         )}
-
       </div>
 
       {/* 사진 섹션 */}
@@ -249,6 +283,56 @@ const OroomDetailView: React.FC<OroomDetailViewProps> = ({ oroom, onBack, onEdit
           오름 정보 수정하기
         </Button>
       </div>
+
+      {/* 오름게임카드 큰 이미지 모달 */}
+      {showGameCardModal && oroom.cardImage && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowGameCardModal(false)}
+        >
+          <div className="relative max-w-2xl max-h-full">
+            <img
+              src={oroom.cardImage.url}
+              alt={`${oroom.name} 오름게임카드`}
+              className="max-w-full max-h-full object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setShowGameCardModal(false)}
+              className="absolute top-4 right-4 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 일반 이미지 큰 이미지 모달 */}
+      {showImageModal && selectedImage && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowImageModal(false)}
+        >
+          <div className="relative max-w-4xl max-h-full">
+            <img
+              src={selectedImage.url}
+              alt={selectedImage.alt}
+              className="max-w-full max-h-full object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setShowImageModal(false)}
+              className="absolute top-4 right-4 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-2 transition-colors"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
