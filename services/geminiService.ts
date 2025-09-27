@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { InitialFormData, Place, OroomInitialFormData, OroomData } from '../types';
+import { findRegionByName, getRegionsByType } from '../data/csvRegionLoader';
 
 // The API key is sourced from the environment variable `process.env.API_KEY`.
 // It is assumed to be pre-configured and accessible in the execution environment.
@@ -136,6 +137,8 @@ const oroomAnalysisSchema = {
     properties: {
         name: { type: Type.STRING, description: "오름의 정확한 이름" },
         address: { type: Type.STRING, description: "오름의 정확한 주소" },
+        latitude: { type: Type.NUMBER, description: "GPS 위도 좌표", nullable: true },
+        longitude: { type: Type.NUMBER, description: "GPS 경도 좌표", nullable: true },
         difficulty: {
             type: Type.STRING,
             description: "난이도: '쉬움', '보통', '어려움', '매우어려움' 중 하나",
@@ -182,14 +185,15 @@ ${formData.description}
 # INSTRUCTIONS
 1. **오름 이름**: 설명에서 오름의 정확한 이름을 추출하세요
 2. **주소**: 오름이 위치한 정확한 주소를 추출하세요 (제주특별자치도 포함)
-3. **난이도**: 설명을 바탕으로 등반 난이도를 판단하세요 ('쉬움', '보통', '어려움', '매우어려움')
-4. **주요 계절**: 방문하기 좋은 계절을 추천하세요 ('봄', '여름', '가을', '겨울')
-5. **주요 월**: 가장 좋은 방문 월을 선택하세요 ('4월', '5월' 등)
-6. **왕복 소요 시간**: 평균적인 왕복 소요 시간을 추정하세요 ('왕복 1시간' 형식)
-7. **정상뷰**: 정상에서의 경치 수준을 평가하세요 ('상', '중', '하')
-8. **전문가 팁**: 등반 시 주의사항, 추천 코스, 준비물, 날씨별 팁 등을 자세히 설명하세요
-9. **주변 관광지**: 오름 근처의 관광지나 명소들을 나열하세요
-10. **이름 유래**: 오름 이름의 유래나 의미를 설명하세요
+3. **GPS 좌표**: 위도(latitude)와 경도(longitude)를 포함하세요 (알 수 없으면 null)
+4. **난이도**: 설명을 바탕으로 등반 난이도를 판단하세요 ('쉬움', '보통', '어려움', '매우어려움')
+5. **주요 계절**: 방문하기 좋은 계절을 추천하세요 ('봄', '여름', '가을', '겨울')
+6. **주요 월**: 가장 좋은 방문 월을 선택하세요 ('4월', '5월' 등)
+7. **왕복 소요 시간**: 평균적인 왕복 소요 시간을 추정하세요 ('왕복 1시간' 형식)
+8. **정상뷰**: 정상에서의 경치 수준을 평가하세요 ('상', '중', '하')
+9. **전문가 팁**: 등반 시 주의사항, 추천 코스, 준비물, 날씨별 팁 등을 자세히 설명하세요
+10. **주변 관광지**: 오름 근처의 관광지나 명소들을 나열하세요
+11. **이름 유래**: 오름 이름의 유래나 의미를 설명하세요
 
 # OUTPUT
 JSON 형태로만 반환하세요. 추가 설명이나 마크다운 없이 순수한 JSON만 출력하세요.
@@ -212,9 +216,37 @@ JSON 형태로만 반환하세요. 추가 설명이나 마크다운 없이 순�
 
         const analysisResult = JSON.parse(jsonText);
 
+        // alljeju.csv에서 오름 이름으로 GPS 좌표 찾기
+        let gpsCoordinates = { latitude: null, longitude: null };
+        let gpsFound = false;
+        if (analysisResult.name) {
+            try {
+                const regionInfo = await findRegionByName(analysisResult.name);
+                if (regionInfo && regionInfo.type === '오름') {
+                    gpsCoordinates = {
+                        latitude: regionInfo.lat,
+                        longitude: regionInfo.lng
+                    };
+                    gpsFound = true;
+                    console.log(`🗺️ ${analysisResult.name} GPS 좌표 찾음:`, gpsCoordinates);
+
+                    // 주소에 GPS 좌표 정보 추가
+                    if (analysisResult.address && !analysisResult.address.includes('GPS')) {
+                        analysisResult.address += `\n📍 GPS: ${gpsCoordinates.latitude.toFixed(6)}, ${gpsCoordinates.longitude.toFixed(6)}`;
+                    }
+                } else {
+                    console.log(`⚠️ ${analysisResult.name} 오름이 alljeju.csv에서 찾을 수 없습니다.`);
+                }
+            } catch (error) {
+                console.log('GPS 좌표 검색 중 오류:', error);
+            }
+        }
+
         // 현재 시간으로 메타데이터 추가
         return {
             ...analysisResult,
+            latitude: gpsCoordinates.latitude || analysisResult.latitude,
+            longitude: gpsCoordinates.longitude || analysisResult.longitude,
             id: Date.now().toString(),
             parkingImages: [],
             entranceImages: [],

@@ -181,6 +181,24 @@ const OroomDetailForm: React.FC<OroomDetailFormProps> = ({ oroomData, onSave, on
               required
             />
 
+            <Input
+              label="GPS 위도"
+              type="number"
+              step="any"
+              value={formData.latitude || ''}
+              onChange={(e) => handleInputChange('latitude', e.target.value ? parseFloat(e.target.value) : undefined)}
+              placeholder="33.3617"
+            />
+
+            <Input
+              label="GPS 경도"
+              type="number"
+              step="any"
+              value={formData.longitude || ''}
+              onChange={(e) => handleInputChange('longitude', e.target.value ? parseFloat(e.target.value) : undefined)}
+              placeholder="126.5292"
+            />
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">난이도 *</label>
               <select

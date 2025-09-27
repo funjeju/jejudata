@@ -664,26 +664,14 @@ ${currentInput}
         ` : '기상청 데이터를 가져올 수 없었습니다.';
 
         const textPart = {
-            text: `당신은 제주도 전문 기상 캐스터입니다. 간결하고 명확한 브리핑을 제공해주세요.
+            text: `제주도 기상 캐스터로서 ${source.sourceTitle} 현재 날씨를 간단히 브리핑하세요.
 
-현재 분석 자료:
-📍 ${source.sourceTitle} 실시간 영상
-${weatherInfo}
+기상 데이터: ${source.weatherData?.temp}, ${source.weatherData?.humidity}, ${source.weatherData?.wind}
 
-다음 형식으로 간결하게 브리핑해주세요:
-
-🌤️ **현재 날씨 상황**
-- 하늘 상태와 구름량을 한 문장으로
-- 가시거리나 특이사항이 있다면 간단히
-
-📊 **기상 데이터**
-- 현재 기온의 특징 (평년 대비, 체감온도 등)
-- 습도와 바람의 현재 상태
-
-💡 **외출 팁**
-- 현재 날씨에 맞는 복장이나 주의사항을 1-2줄로
-
-총 5-6줄 이내로 간결하게 작성해주세요.`
+다음 형식으로 3줄만:
+🌤️ 현재 날씨: [하늘상태와 기온 1줄]
+📊 바람/습도: [바람과 습도 상태 1줄]
+💡 외출팁: [복장/주의사항 1줄]`
         };
 
         const response = await ai.models.generateContentStream({

@@ -142,9 +142,20 @@ const OroomDBModal: React.FC<OroomDBModalProps> = ({ isOpen, onClose }) => {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">🏔️ 오름 데이터베이스</h2>
-              <Button onClick={handleAddOroom} className="bg-green-600 hover:bg-green-700">
-                + 오름 추가하기
-              </Button>
+              <div className="flex items-center gap-3">
+                <Button onClick={handleAddOroom} className="bg-green-600 hover:bg-green-700">
+                  + 오름 추가하기
+                </Button>
+                <button
+                  onClick={handleClose}
+                  className="text-gray-400 hover:text-gray-600 transition-colors bg-white rounded-full p-2 shadow-md"
+                  title="닫기"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             {/* 오름 목록 - 2열 그리드 */}
@@ -189,13 +200,18 @@ const OroomDBModal: React.FC<OroomDBModalProps> = ({ isOpen, onClose }) => {
                     {/* 사진 2장 - 정상뷰와 탐방로 */}
                     <div className="flex gap-2">
                       {/* 정상뷰 사진 */}
-                      <div className="flex-1 h-24 bg-gray-200 rounded-lg flex items-center justify-center">
+                      <div className="flex-1 h-24 bg-gray-200 rounded-lg flex items-center justify-center relative overflow-hidden">
                         {oroom.summitImages.length > 0 ? (
-                          <img
-                            src={oroom.summitImages[0].url}
-                            alt={`${oroom.name} 정상뷰`}
-                            className="w-full h-full object-cover rounded-lg"
-                          />
+                          <>
+                            <img
+                              src={oroom.summitImages[0].url}
+                              alt={`${oroom.name} 정상뷰`}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
+                            <div className="absolute top-1 left-1 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-xs px-2 py-1 rounded-md font-medium shadow-lg">
+                              🌅 정상뷰
+                            </div>
+                          </>
                         ) : (
                           <div className="text-center">
                             <span className="text-gray-400 text-lg">🌅</span>
@@ -205,13 +221,18 @@ const OroomDBModal: React.FC<OroomDBModalProps> = ({ isOpen, onClose }) => {
                       </div>
 
                       {/* 탐방로 사진 */}
-                      <div className="flex-1 h-24 bg-gray-200 rounded-lg flex items-center justify-center">
+                      <div className="flex-1 h-24 bg-gray-200 rounded-lg flex items-center justify-center relative overflow-hidden">
                         {oroom.trailImages.length > 0 ? (
-                          <img
-                            src={oroom.trailImages[0].url}
-                            alt={`${oroom.name} 탐방로`}
-                            className="w-full h-full object-cover rounded-lg"
-                          />
+                          <>
+                            <img
+                              src={oroom.trailImages[0].url}
+                              alt={`${oroom.name} 탐방로`}
+                              className="w-full h-full object-cover rounded-lg"
+                            />
+                            <div className="absolute top-1 left-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs px-2 py-1 rounded-md font-medium shadow-lg">
+                              🥾 탐방로
+                            </div>
+                          </>
                         ) : (
                           <div className="text-center">
                             <span className="text-gray-400 text-lg">🥾</span>

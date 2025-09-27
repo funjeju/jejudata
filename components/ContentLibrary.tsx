@@ -1,12 +1,13 @@
 
-import React, { useState, useMemo } from 'react';
-import type { Place } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import type { Place, OroomData } from '../types';
 import { CATEGORIES, REGIONS } from '../constants';
 import Button from './common/Button';
 import Card from './common/Card';
 import Input from './common/Input';
 import ExportModal from './ExportModal';
 import GoogleMapView from './GoogleMapView';
+import { subscribeToOrooms } from '../services/oroomFirestore';
 
 interface ContentLibraryProps {
   spots: Place[];
@@ -57,6 +58,16 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [deleteConfirmSpot, setDeleteConfirmSpot] = useState<Place | null>(null);
+  const [orooms, setOrooms] = useState<OroomData[]>([]);
+
+  // 오름 데이터 실시간 구독
+  useEffect(() => {
+    const unsubscribe = subscribeToOrooms((oroomList) => {
+      setOrooms(oroomList);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleDeleteClick = (spot: Place) => {
     setDeleteConfirmSpot(spot);
@@ -220,6 +231,7 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
         <div className="mb-6">
           <GoogleMapView
             spots={filteredAndSortedSpots}
+            orooms={orooms}
             onSpotClick={onView}
             height="500px"
           />

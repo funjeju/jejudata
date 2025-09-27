@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import type { Place } from '../types';
+import type { Place, OroomData } from '../types';
 
 interface GoogleMapViewProps {
   spots: Place[];
+  orooms?: OroomData[];
   onSpotClick?: (spot: Place) => void;
   height?: string;
 }
@@ -19,7 +20,8 @@ const getCategoryColor = (category?: string): string => {
     '자연': '#98d8c8',
     '문화': '#f7dc6f',
     '해변': '#74b9ff',
-    '산': '#55a3ff'
+    '산': '#55a3ff',
+    '오름': '#8B4513' // 갈색 (산/자연 계열)
   };
   return colorMap[category || '기타'] || '#95a5a6';
 };
@@ -31,7 +33,7 @@ declare global {
   }
 }
 
-const GoogleMapView: React.FC<GoogleMapViewProps> = ({ spots, onSpotClick, height = '400px' }) => {
+const GoogleMapView: React.FC<GoogleMapViewProps> = ({ spots, orooms = [], onSpotClick, height = '400px' }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -112,7 +114,7 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ spots, onSpotClick, heigh
       // 폴백 지도 업데이트
       renderStaticMap();
     }
-  }, [spots]);
+  }, [spots, orooms]);
 
   const renderStaticMap = () => {
     if (!mapContainer.current) return;
@@ -220,6 +222,46 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ spots, onSpotClick, heigh
       center: { lat: centerLat, lng: centerLng },
       zoom: 10,
       mapTypeId: window.google.maps.MapTypeId.ROADMAP,
+      styles: [
+        {
+          featureType: "poi",
+          elementType: "labels",
+          stylers: [{ visibility: "off" }]
+        },
+        {
+          featureType: "poi.business",
+          stylers: [{ visibility: "off" }]
+        },
+        {
+          featureType: "poi.park",
+          elementType: "labels.text",
+          stylers: [{ visibility: "off" }]
+        },
+        {
+          featureType: "poi.attraction",
+          stylers: [{ visibility: "off" }]
+        },
+        {
+          featureType: "poi.government",
+          stylers: [{ visibility: "off" }]
+        },
+        {
+          featureType: "poi.medical",
+          stylers: [{ visibility: "off" }]
+        },
+        {
+          featureType: "poi.place_of_worship",
+          stylers: [{ visibility: "off" }]
+        },
+        {
+          featureType: "poi.school",
+          stylers: [{ visibility: "off" }]
+        },
+        {
+          featureType: "poi.sports_complex",
+          stylers: [{ visibility: "off" }]
+        }
+      ]
     };
 
     const newMap = new window.google.maps.Map(mapContainer.current, mapOptions);
@@ -235,7 +277,7 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ spots, onSpotClick, heigh
     markersRef.current.forEach(marker => marker.setMap(null));
     markersRef.current = [];
 
-    // 새 마커들 추가
+    // 일반 스팟 마커 추가
     spots.forEach(spot => {
       if (!spot.location?.latitude || !spot.location?.longitude) return;
 
@@ -277,11 +319,77 @@ const GoogleMapView: React.FC<GoogleMapViewProps> = ({ spots, onSpotClick, heigh
         infoWindow.open(mapRef.current, marker);
       });
     });
+
+    // 오름 마커 추가
+    orooms.forEach(oroom => {
+      if (!oroom.latitude || !oroom.longitude) return;
+
+      const position = { lat: oroom.latitude, lng: oroom.longitude };
+      const marker = new window.google.maps.Marker({
+        position: position,
+        map: mapRef.current,
+        title: oroom.name,
+        icon: {
+          path: window.google.maps.SymbolPath.BACKWARD_CLOSED_ARROW, // 삼각형 모양으로 구분
+          fillColor: getCategoryColor('오름'),
+          fillOpacity: 1,
+          strokeColor: 'white',
+          strokeWeight: 2,
+          scale: 10,
+          rotation: 0
+        },
+      });
+
+      markersRef.current.push(marker);
+
+      // 오름 정보창 추가
+      const infoWindow = new window.google.maps.InfoWindow({
+        content: `
+          <div class="p-2">
+            <h3 class="font-semibold text-sm">🏔️ ${oroom.name}</h3>
+            <p class="text-xs text-gray-600">오름 • 난이도: ${oroom.difficulty}</p>
+            <p class="text-xs text-gray-500">${oroom.roundTripTime}</p>
+          </div>
+        `,
+      });
+
+      marker.addListener('click', () => {
+        infoWindow.open(mapRef.current, marker);
+      });
+    });
   };
 
   return (
-    <div className="w-full" style={{ height }}>
+    <div className="w-full relative" style={{ height }}>
       <div ref={mapContainer} className="w-full rounded-lg shadow-lg" style={{ height }} />
+
+      {/* 범례 */}
+      <div className="absolute bottom-8 left-2 bg-white bg-opacity-90 backdrop-blur-sm rounded-lg shadow-lg p-3 text-xs z-10">
+        <h4 className="font-semibold mb-2 text-gray-800">범례</h4>
+        <div className="space-y-1">
+          {/* 일반 스팟 카테고리 */}
+          {['관광지', '맛집', '카페', '숙소', '쇼핑', '액티비티', '자연', '문화', '해변', '산'].map(category => (
+            <div key={category} className="flex items-center gap-2">
+              <div
+                className="w-3 h-3 rounded-full border border-white"
+                style={{ backgroundColor: getCategoryColor(category) }}
+              ></div>
+              <span className="text-gray-700">{category}</span>
+            </div>
+          ))}
+          {/* 오름 */}
+          <div className="flex items-center gap-2">
+            <div
+              className="w-3 h-3 border border-white"
+              style={{
+                backgroundColor: getCategoryColor('오름'),
+                clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)'
+              }}
+            ></div>
+            <span className="text-gray-700">오름</span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

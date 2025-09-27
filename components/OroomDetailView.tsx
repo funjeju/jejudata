@@ -99,6 +99,28 @@ const OroomDetailView: React.FC<OroomDetailViewProps> = ({ oroom, onBack, onEdit
             <p className="text-gray-900">{oroom.address}</p>
           </div>
 
+          {(oroom.latitude && oroom.longitude) && (
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">GPS 좌표</label>
+              <div className="flex items-center gap-4">
+                <p className="text-gray-900">
+                  위도: <span className="font-mono text-blue-600">{oroom.latitude.toFixed(6)}</span>
+                </p>
+                <p className="text-gray-900">
+                  경도: <span className="font-mono text-blue-600">{oroom.longitude.toFixed(6)}</span>
+                </p>
+                <a
+                  href={`https://www.google.com/maps?q=${oroom.latitude},${oroom.longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-green-600 hover:text-green-800 text-sm underline"
+                >
+                  🗺️ 지도에서 보기
+                </a>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">난이도</label>
             <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
