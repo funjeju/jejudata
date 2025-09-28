@@ -1,43 +1,24 @@
 import React, { useState } from 'react';
 import type { InitialFormData } from '../types';
-import { CATEGORIES } from '../constants';
 import Button from './common/Button';
-import CheckboxGroup from './common/CheckboxGroup';
 import Input from './common/Input';
 import Textarea from './common/Textarea';
 import Card from './common/Card';
 
 interface InitialFormProps {
+  categoryData: {spotName: string, categories: string[]};
   onGenerateDraft: (formData: InitialFormData) => void;
   error: string | null;
   onBack: () => void;
-  initialValues?: InitialFormData;
+  initialValues?: {spotDescription: string, importUrl: string};
 }
 
-const InitialForm: React.FC<InitialFormProps> = ({ onGenerateDraft, error, onBack, initialValues }) => {
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(initialValues?.categories || []);
-  const [spotName, setSpotName] = useState(initialValues?.spotName || '');
+const InitialForm: React.FC<InitialFormProps> = ({ categoryData, onGenerateDraft, error, onBack, initialValues }) => {
   const [spotDescription, setSpotDescription] = useState(initialValues?.spotDescription || '');
   const [importUrl, setImportUrl] = useState(initialValues?.importUrl || '');
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const handleCategoryChange = (category: string) => {
-    setSelectedCategories(prev =>
-      prev.includes(category)
-        ? prev.filter(c => c !== category)
-        : [...prev, category]
-    );
-  };
-
   const handleSubmit = () => {
-    if (selectedCategories.length < 1) {
-      setValidationError('카테고리를 1개 이상 선택해주세요.');
-      return false;
-    }
-    if (!spotName.trim()) {
-      setValidationError('스팟 이름을 입력해주세요.');
-      return false;
-    }
     if (!spotDescription.trim()) {
         setValidationError('스팟 설명을 입력해주세요.');
         return false;
@@ -48,11 +29,11 @@ const InitialForm: React.FC<InitialFormProps> = ({ onGenerateDraft, error, onBac
     }
 
     setValidationError(null);
-    onGenerateDraft({ 
-        categories: selectedCategories, 
-        spotName,
+    onGenerateDraft({
+        categories: categoryData.categories,
+        spotName: categoryData.spotName,
         spotDescription,
-        importUrl 
+        importUrl
     });
   };
 
@@ -61,27 +42,13 @@ const InitialForm: React.FC<InitialFormProps> = ({ onGenerateDraft, error, onBac
     <Card>
       <div className="space-y-8">
         <div>
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">2단계: 기본 정보 입력</h3>
-          <p className="text-sm text-gray-500 mb-4">AI 초안 생성을 위해 스팟의 기본 정보를 입력합니다.</p>
-          <div className="space-y-4">
-            <CheckboxGroup
-              label="카테고리 선택 (필수, 1개 이상)"
-              options={CATEGORIES}
-              selectedOptions={selectedCategories}
-              onChange={handleCategoryChange}
-            />
-            <Input
-              label="스팟 이름 (필수)"
-              id="spotName"
-              value={spotName}
-              onChange={(e) => setSpotName(e.target.value)}
-              placeholder="예: 새별오름"
-            />
-          </div>
+          <h3 className="text-lg font-semibold text-gray-800 mb-2">2단계: 스팟 설명 입력</h3>
+          <p className="text-sm text-gray-500 mb-4">
+            <strong>{categoryData.spotName}</strong> ({categoryData.categories.join(', ')})에 대한 상세 설명을 입력하세요.
+          </p>
         </div>
-        
+
         <div>
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">2-1단계: 상세 정보 입력</h3>
           <p className="text-sm text-gray-500 mb-4">전문가님의 지식을 바탕으로 스팟을 자유롭게 설명해주세요. 이 설명을 기반으로 AI가 상세 데이터를 생성합니다. 더 정확한 정보 추출을 위해 관련 URL을 추가할 수 있습니다.</p>
            <div className="space-y-4">
              <Textarea

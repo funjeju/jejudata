@@ -91,6 +91,7 @@ const LinkedSpotEditor: React.FC<{
 
 const ReviewDashboard: React.FC<ReviewDashboardProps> = ({ initialData, onSave, allSpots, onAddStubSpot, onBack }) => {
   const [data, setData] = useState<Place>(initialData);
+  const [timeOfDayInput, setTimeOfDayInput] = useState<string>((initialData.attributes?.recommended_time_of_day || []).join(', '));
 
   const handleInputChange = <K extends keyof Place,>(field: K, value: Place[K]) => {
     setData(prev => ({ ...prev, [field]: value }));
@@ -257,7 +258,7 @@ const ReviewDashboard: React.FC<ReviewDashboardProps> = ({ initialData, onSave, 
                 <Select label="주차 난이도" value={data.attributes.parkingDifficulty} onChange={e => handleAttributeChange('parkingDifficulty', e.target.value)} options={PARKING_DIFFICULTY_OPTIONS} />
                 <Select label="입장료" value={data.attributes.admissionFee} onChange={e => handleAttributeChange('admissionFee', e.target.value)} options={ADMISSION_FEE_OPTIONS} />
                  <div className="col-span-2 md:col-span-3">
-                   <Input label="추천 시간대 (쉼표로 구분)" value={(data.attributes.recommended_time_of_day || []).join(', ')} onChange={e => handleAttributeChange('recommended_time_of_day', e.target.value.split(',').map(t => t.trim()).filter(Boolean))} placeholder="예: 오전, 일몰, 점심시간 피하기" />
+                   <Input label="추천 시간대 (쉼표로 구분)" value={timeOfDayInput} onChange={e => setTimeOfDayInput(e.target.value)} onBlur={e => handleAttributeChange('recommended_time_of_day', e.target.value.split(',').map(t => t.trim()).filter(Boolean))} placeholder="예: 오전, 일몰, 점심시간 피하기" />
                  </div>
               </div>
               <div className="mt-6">

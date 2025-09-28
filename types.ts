@@ -168,3 +168,13 @@ export interface OroomData {
 export interface OroomInitialFormData {
   description: string; // AI가 분석할 오름 설명 텍스트
 }
+
+// 여행일정 AI용 고정 스팟 타입
+export interface FixedSpot {
+  name: string;
+  lat: number;
+  lng: number;
+  address: string;
+  placeId: string;
+  type: 'accommodation' | 'restaurant' | 'attraction';
+}

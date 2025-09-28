@@ -329,10 +329,13 @@ const OroomDetailForm: React.FC<OroomDetailFormProps> = ({ oroomData, onSave, on
             <textarea
               value={formData.expertTip}
               onChange={(e) => handleInputChange('expertTip', e.target.value)}
-              placeholder="등반 시 주의사항, 추천 코스, 준비물, 날씨별 팁 등을 입력하세요"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-              rows={3}
+              placeholder="AI가 생성한 전문가 팁을 자유롭게 수정하세요.&#10;&#10;포함할 내용:&#10;• 등반 준비물 (신발, 의류, 물, 간식)&#10;• 날씨별 주의사항&#10;• 추천 등반 경로 및 소요시간&#10;• 안전 수칙 및 위험 구간&#10;• 체력 관리법 및 휴식 포인트&#10;• 최적 등반 시간대&#10;• 주차장 정보 및 주차 팁&#10;• 사진 촬영 명소&#10;• 계절별 특별 주의사항&#10;• 초보자/숙련자별 맞춤 조언"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm leading-relaxed"
+              rows={8}
             />
+            <p className="text-xs text-gray-500 mt-2">
+              💡 팁: AI가 생성한 내용을 기반으로 더욱 상세하고 실용적인 정보로 업데이트하세요.
+            </p>
           </div>
 
           <div>

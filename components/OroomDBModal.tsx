@@ -158,85 +158,137 @@ const OroomDBModal: React.FC<OroomDBModalProps> = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            {/* 오름 목록 - 2열 그리드 */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 오름 목록 - 2열 그리드 (카드 형태) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {orooms.map((oroom) => (
-                <div key={oroom.id} className="bg-white border rounded-lg p-4 hover:shadow-lg transition-shadow">
-                  <div className="space-y-3">
-                    {/* 오름 이름과 삭제 버튼 */}
-                    <div className="flex items-center justify-between">
-                      <button
-                        onClick={() => handleViewOroom(oroom)}
-                        className="text-left hover:text-green-600 transition-colors flex-1"
-                      >
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-lg text-gray-900 hover:underline truncate">{oroom.name}</h3>
-                          <div className="flex items-center gap-1">
-                            {/* 난이도 이모티콘 */}
-                            <span title={`난이도: ${oroom.difficulty}`}>
-                              {oroom.difficulty === '쉬움' ? '🟢' :
-                               oroom.difficulty === '보통' ? '🟡' :
-                               oroom.difficulty === '어려움' ? '🟠' : '🔴'}
-                            </span>
-                            {/* 정상뷰 이모티콘 */}
-                            <span title={`정상뷰: ${oroom.summitView}`}>
-                              {oroom.summitView === '상' ? '🌟' :
-                               oroom.summitView === '중' ? '⭐' : '✨'}
-                            </span>
+                <div key={oroom.id} className="bg-white border rounded-lg overflow-hidden hover:shadow-lg transition-shadow h-80">
+                  <div className="flex h-full">
+                    {/* 좌측: 오름게임카드 (카드의 절반 비율) */}
+                    <div className="w-1/2 h-full flex-shrink-0 bg-gray-100">
+                      {oroom.cardImage ? (
+                        <button
+                          onClick={() => handleViewOroom(oroom)}
+                          className="w-full h-full block"
+                        >
+                          <img
+                            src={oroom.cardImage.url}
+                            alt={`${oroom.name} 오름게임카드`}
+                            className="w-full h-full object-cover hover:opacity-90 transition-opacity"
+                          />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleViewOroom(oroom)}
+                          className="w-full h-full flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+                        >
+                          <div className="text-center">
+                            <span className="text-xl">🏔️</span>
+                            <p className="text-xs mt-1">게임카드</p>
                           </div>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteOroom(oroom.id, oroom.name)}
-                        className="ml-2 text-red-500 hover:text-red-700 transition-colors p-1"
-                        title="삭제"
-                      >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2v1a1 1 0 001 1h6a1 1 0 001-1V3a2 2 0 012 2v1H4V5zM3 8a1 1 0 011-1h12a1 1 0 110 2l-.867 10.142A2 2 0 0113.138 21H6.862a2 2 0 01-1.995-1.858L4 8z" clipRule="evenodd" />
-                        </svg>
-                      </button>
+                        </button>
+                      )}
                     </div>
 
-                    {/* 사진 2장 - 정상뷰와 탐방로 */}
-                    <div className="flex gap-2">
-                      {/* 정상뷰 사진 */}
-                      <div className="flex-1 h-24 bg-gray-200 rounded-lg flex items-center justify-center relative overflow-hidden">
-                        {oroom.summitImages.length > 0 ? (
-                          <>
-                            <img
-                              src={oroom.summitImages[0].url}
-                              alt={`${oroom.name} 정상뷰`}
-                              className="w-full h-full object-cover rounded-lg"
-                            />
-                            <div className="absolute top-1 left-1 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-xs px-2 py-1 rounded-md font-medium shadow-lg">
-                              🌅 정상뷰
+                    {/* 우측: 내용 영역 */}
+                    <div className="flex-1 p-3 flex flex-col">
+                      {/* 상단: 제목과 아이콘, 삭제버튼 */}
+                      <div className="flex items-start justify-between mb-2">
+                        <button
+                          onClick={() => handleViewOroom(oroom)}
+                          className="text-left hover:text-green-600 transition-colors flex-1"
+                        >
+                          <div className="flex items-center gap-1">
+                            <h3 className="font-bold text-base text-gray-900 hover:underline truncate">{oroom.name}</h3>
+                            <div className="flex items-center gap-0.5">
+                              {/* 난이도 이모티콘 */}
+                              <span title={`난이도: ${oroom.difficulty}`} className="text-sm">
+                                {oroom.difficulty === '쉬움' ? '🟢' :
+                                 oroom.difficulty === '보통' ? '🟡' :
+                                 oroom.difficulty === '어려움' ? '🟠' : '🔴'}
+                              </span>
+                              {/* 정상뷰 이모티콘 */}
+                              <span title={`정상뷰: ${oroom.summitView}`} className="text-sm">
+                                {oroom.summitView === '상' ? '🌟' :
+                                 oroom.summitView === '중' ? '⭐' : '✨'}
+                              </span>
                             </div>
-                          </>
-                        ) : (
-                          <div className="text-center">
-                            <span className="text-gray-400 text-lg">🌅</span>
-                            <p className="text-gray-400 text-xs mt-1">정상뷰</p>
                           </div>
-                        )}
+                          <p className="text-xs text-gray-600 mt-0.5">{oroom.roundTripTime}</p>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteOroom(oroom.id, oroom.name)}
+                          className="ml-2 text-red-500 hover:text-red-700 transition-colors p-1 hover:bg-red-50 rounded"
+                          title="삭제"
+                        >
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9zM4 5a2 2 0 012-2v1a1 1 0 001 1h6a1 1 0 001-1V3a2 2 0 012 2v1H4V5zM3 8a1 1 0 011-1h12a1 1 0 110 2l-.867 10.142A2 2 0 0113.138 21H6.862a2 2 0 01-1.995-1.858L4 8z" clipRule="evenodd" />
+                          </svg>
+                        </button>
                       </div>
 
-                      {/* 탐방로 사진 */}
-                      <div className="flex-1 h-24 bg-gray-200 rounded-lg flex items-center justify-center relative overflow-hidden">
-                        {oroom.trailImages.length > 0 ? (
-                          <>
-                            <img
-                              src={oroom.trailImages[0].url}
-                              alt={`${oroom.name} 탐방로`}
-                              className="w-full h-full object-cover rounded-lg"
-                            />
-                            <div className="absolute top-1 left-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs px-2 py-1 rounded-md font-medium shadow-lg">
-                              🥾 탐방로
+                      {/* 하단: 정상뷰와 탐방로 사진 (세로 배치) */}
+                      <div className="flex-1 space-y-2">
+                        {/* 정상뷰 사진 */}
+                        <div className="h-20 bg-gray-200 rounded-md flex items-center justify-center relative overflow-hidden">
+                          {oroom.summitImages.length > 0 ? (
+                            <>
+                              <img
+                                src={oroom.summitImages[0].url}
+                                alt={`${oroom.name} 정상뷰`}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute top-0.5 left-0.5 bg-gradient-to-r from-orange-500 to-pink-500 text-white text-xs px-1 py-0.5 rounded font-medium">
+                                🌅 정상뷰
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center">
+                              <span className="text-gray-400 text-sm">🌅</span>
+                              <p className="text-gray-400 text-xs">정상뷰</p>
                             </div>
-                          </>
-                        ) : (
-                          <div className="text-center">
-                            <span className="text-gray-400 text-lg">🥾</span>
-                            <p className="text-gray-400 text-xs mt-1">탐방로</p>
+                          )}
+                        </div>
+
+                        {/* 탐방로 사진 */}
+                        <div className="h-20 bg-gray-200 rounded-md flex items-center justify-center relative overflow-hidden">
+                          {oroom.trailImages.length > 0 ? (
+                            <>
+                              <img
+                                src={oroom.trailImages[0].url}
+                                alt={`${oroom.name} 탐방로`}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute top-0.5 left-0.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs px-1 py-0.5 rounded font-medium">
+                                🥾 탐방로
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center">
+                              <span className="text-gray-400 text-sm">🥾</span>
+                              <p className="text-gray-400 text-xs">탐방로</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 전문가 팁 */}
+                        {oroom.expertTip && (
+                          <div className="mt-2">
+                            <div className="flex items-start gap-1">
+                              <span className="text-amber-600 text-xs">💡</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-gray-700 leading-relaxed line-clamp-2">
+                                  {oroom.expertTip}
+                                </p>
+                                {oroom.expertTip.length > 80 && (
+                                  <button
+                                    onClick={() => handleViewOroom(oroom)}
+                                    className="text-xs text-blue-600 hover:text-blue-800 font-medium mt-0.5"
+                                  >
+                                    more
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>

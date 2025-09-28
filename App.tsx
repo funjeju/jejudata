@@ -1,6 +1,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import type { Place, InitialFormData, Suggestion, EditLog, WeatherSource } from './types';
+import CategoryForm from './components/CategoryForm';
 import InitialForm from './components/InitialForm';
 import ReviewDashboard from './components/ReviewDashboard';
 import ContentLibrary from './components/ContentLibrary';
@@ -22,7 +23,7 @@ import { sanitizePlaceForFirestore, parsePlaceFromFirestore } from './services/p
 import { testWeatherAPI, getCurrentWeather, JEJU_WEATHER_STATIONS } from './services/weatherService';
 import { testCapture, captureWeatherScene } from './services/youtubeCapture';
 
-type AppStep = 'library' | 'initial' | 'loading' | 'review' | 'view';
+type AppStep = 'library' | 'category' | 'initial' | 'loading' | 'review' | 'view';
 
 // Utility to set a value in a nested object using a string path
 // This is a simplified version and might not cover all edge cases like lodash.set
@@ -53,6 +54,7 @@ const App: React.FC = () => {
   const [spots, setSpots] = useState<Place[]>([]);
   const [step, setStep] = useState<AppStep>('library');
   const [dataToEdit, setDataToEdit] = useState<Place | null>(null);
+  const [categoryFormData, setCategoryFormData] = useState<{spotName: string, categories: string[]} | null>(null);
   const [spotToView, setSpotToView] = useState<Place | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -190,7 +192,10 @@ const App: React.FC = () => {
     if (step === 'review') {
       setStep('initial');
     } else if (step === 'initial') {
+      setStep('category');
+    } else if (step === 'category') {
       setDataToEdit(null);
+      setCategoryFormData(null);
       setStep('library');
     } else if (step === 'view') {
         setSpotToView(null);
@@ -502,6 +507,12 @@ const App: React.FC = () => {
 
   const handleStartNew = () => {
     setDataToEdit(null);
+    setCategoryFormData(null);
+    setStep('category');
+  };
+
+  const handleCategorySubmit = (data: {spotName: string, categories: string[]}) => {
+    setCategoryFormData(data);
     setStep('initial');
   };
 
@@ -509,6 +520,10 @@ const App: React.FC = () => {
     setSpotToView(null);
     setDataToEdit(spot);
     if (spot.status === 'stub') {
+      setCategoryFormData({
+        spotName: spot.place_name,
+        categories: spot.categories || []
+      });
       setStep('initial');
     } else {
       setStep('review');
@@ -636,20 +651,35 @@ const App: React.FC = () => {
         }
         setStep('library');
         return null;
+      case 'category': {
+        const categoryInitialValues = dataToEdit ? {
+            spotName: dataToEdit.place_name,
+            categories: dataToEdit.categories || []
+        } : undefined;
+        return <CategoryForm onSubmit={handleCategorySubmit} error={error} onBack={handleGoBack} initialValues={categoryInitialValues} />;
+      }
       case 'initial': {
         const initialValues = dataToEdit ? {
-            spotName: dataToEdit.place_name,
-            categories: dataToEdit.categories || [],
             spotDescription: dataToEdit.expert_tip_raw || '',
             importUrl: dataToEdit.import_url || '',
         } : undefined;
-        return <InitialForm onGenerateDraft={handleGenerateDraft} error={error} onBack={handleGoBack} initialValues={initialValues} />;
+        return <InitialForm
+          categoryData={categoryFormData!}
+          onGenerateDraft={handleGenerateDraft}
+          error={error}
+          onBack={handleGoBack}
+          initialValues={initialValues}
+        />;
       }
       case 'loading':
         return (
           <div className="text-center p-10">
             <Spinner />
-            <p className="text-lg text-gray-600 mt-4">AI가 전문가님의 설명을 분석하여 초안을 생성 중입니다... 잠시만 기다려주세요.</p>
+            <div className="space-y-3 mt-4">
+              <p className="text-lg text-gray-600">🔍 AI가 해당 스팟에 대한 웹 검색을 진행 중입니다...</p>
+              <p className="text-md text-gray-500">📝 검색 결과와 전문가 설명을 통합하여 초안을 생성하고 있어요.</p>
+              <p className="text-sm text-gray-400">잠시만 기다려주세요.</p>
+            </div>
           </div>
         );
       case 'review':
