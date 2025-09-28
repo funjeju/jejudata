@@ -30,7 +30,7 @@ const isYouTubeUrl = (url: string): boolean => {
 };
 
 // The API key is sourced from the environment variable `process.env.API_KEY`.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 // Utility to convert image URL to a base64 part for Gemini API
 async function urlToGenerativePart(url: string) {

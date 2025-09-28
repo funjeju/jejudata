@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, Chat } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import type { Place, FixedSpot } from '../types';
 import Modal from './common/Modal';
 import Button from './common/Button';
@@ -9,7 +9,7 @@ import CheckboxGroup from './common/CheckboxGroup';
 import SpotSearchModal from './SpotSearchModal';
 
 // The API key is sourced from the environment variable `process.env.API_KEY`.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 // --- New 4-Step Type Definitions ---
 interface TripPlanFormState {
@@ -29,8 +29,8 @@ interface TripPlanFormState {
   mustTryFoods: string[];
 
   // Step 3: Route Constraints
-  dinnerTravelTime: '30min' | '1hour' | '1hour30min';
   nextDayConsideration: 'same_day_finish' | 'next_day_start';
+  dinnerStrategy: 'near_accommodation' | 'near_last_spot'; // only when next_day_start
   postLunchCafe: boolean;
 
   // Step 4: Personal Preferences
@@ -59,8 +59,8 @@ const initialFormState: TripPlanFormState = {
   mustTryFoods: [],
 
   // Step 3: Route Constraints
-  dinnerTravelTime: '1hour',
   nextDayConsideration: 'same_day_finish',
+  dinnerStrategy: 'near_last_spot',
   postLunchCafe: true,
 
   // Step 4: Personal Preferences
@@ -79,16 +79,7 @@ const MINUTE_OPTIONS = ['00', '15', '30', '45'];
 // Step 2 Options
 const MUST_TRY_FOODS = ["흑돼지", "갈치조림", "전복죽", "고등어회", "옥돔구이", "성게미역국", "몸국", "빙떡", "호떡", "오메기떡"];
 
-// Step 3 Options
-const DINNER_TRAVEL_OPTIONS = [
-  { value: '30min', label: '30분 이내 (가까운 곳 위주)' },
-  { value: '1hour', label: '1시간 이내 (적당히 멀어도 OK)' },
-  { value: '1hour30min', label: '1시간 30분 이내 (멀어도 괜찮음)' }
-];
-const NEXT_DAY_OPTIONS = [
-  { value: 'same_day_finish', label: '당일 마무리 중시 (숙소 가까운 곳에서 끝내기)' },
-  { value: 'next_day_start', label: '다음날 시작 고려 (다음날 첫 일정 편의성 우선)' }
-];
+// Step 3 Options - removed, now inline in component
 
 // Step 4 Options
 const COMPANION_OPTIONS = ["혼자", "친구와", "연인과", "아이를 동반한 가족", "부모님을 모시고", "반려견과 함께", "회사 동료와"];
@@ -171,7 +162,6 @@ const TripPlannerModal: React.FC<TripPlannerModalProps> = ({ isOpen, onClose, sp
   const [isLoading, setIsLoading] = useState(false);
   const [finalItinerary, setFinalItinerary] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [chat, setChat] = useState<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // SpotSearchModal 상태들
@@ -182,9 +172,6 @@ const TripPlannerModal: React.FC<TripPlannerModalProps> = ({ isOpen, onClose, sp
   const STEPS = ['timeFrame', 'fixedPoints', 'routeConstraints', 'preferences'];
 
   const resetState = () => {
-    const systemInstruction = `You are an AI trip planner for Jeju Island named '여행일정AI'. Your goal is to create a personalized travel itinerary based on a detailed user profile. You MUST use the provided JSON data of travel spots as your only source of information for recommendations. Present the final itinerary in a clear, day-by-day format using Markdown. Each day should start with '### X일차: [Day's Theme]'. Ensure the route is geographically logical. Include suggestions for meals. Be friendly and helpful.`;
-    const newChat = ai.chats.create({ model: 'gemini-2.5-flash', config: { systemInstruction } });
-    setChat(newChat);
     setFormState(initialFormState);
     setCurrentStep(0);
     setIsLoading(false);
@@ -284,7 +271,6 @@ const TripPlannerModal: React.FC<TripPlannerModalProps> = ({ isOpen, onClose, sp
   };
 
   const handleGenerateItinerary = async () => {
-    if (!chat) return;
 
     setIsLoading(true);
     setError(null);
@@ -306,7 +292,9 @@ const TripPlannerModal: React.FC<TripPlannerModalProps> = ({ isOpen, onClose, sp
 - 숙소 상태: ${formState.accommodationStatus === 'booked' ? '예약완료' : '미예약'}
 ${formState.accommodationStatus === 'booked' && formState.fixedAccommodations.length > 0 ?
   `- 예약된 숙소:\n${formState.fixedAccommodations.map(acc =>
-    `  * ${acc.name} (${acc.address}) - GPS: ${acc.lat}, ${acc.lng}`).join('\n')}` : ''}
+    `  * ${acc.name} (${acc.address}) - GPS: ${acc.lat}, ${acc.lng}`).join('\n')}
+- ⚠️ 숙소 체크인 시간: 일반적으로 15:00 (각 숙소 public_info 확인 필요)` :
+  '- ⚠️ 숙소 체크인 시간: 일반적으로 15:00 (숙소 선택 시 확인 필요)'}
 ${formState.fixedAttractions.length > 0 ?
   `- 필수 방문 관광지:\n${formState.fixedAttractions.map(att =>
     `  * ${att.name} (${att.address}) - GPS: ${att.lat}, ${att.lng}`).join('\n')}` : '- 필수 방문 관광지: 없음'}
@@ -316,35 +304,63 @@ ${formState.fixedRestaurants.length > 0 ?
 - 꼭 먹고싶은 음식: ${formState.mustTryFoods.join(', ') || '없음'}
 
 ## 🛣️ 동선 제약조건 (중요)
-- 저녁식사 이동시간: ${DINNER_TRAVEL_OPTIONS.find(opt => opt.value === formState.dinnerTravelTime)?.label}
-- 숙소 이동 고려: ${NEXT_DAY_OPTIONS.find(opt => opt.value === formState.nextDayConsideration)?.label}
+- 숙소 배치 전략: ${formState.nextDayConsideration === 'same_day_finish' ? '당일 마무리 중시' : '다음날 시작 중시'}${formState.nextDayConsideration === 'next_day_start' ? ` (저녁식사: ${formState.dinnerStrategy === 'near_accommodation' ? '숙소 근처' : '마지막 관광지 근처'})` : ''}
 - 점심 후 카페 포함: ${formState.postLunchCafe ? '필수' : '선택'}
 
 ## 👥 여행 선호도
 - 동행자: ${formState.companions.join(', ') || '없음'}
-- 교통수단: ${formState.transportation}
+- 교통수단: ${formState.transportation} ${formState.transportation === '렌터카' ? '(짐 보관 가능, 숙소 방향 이동 우선)' : ''}
 - 여행 페이스: ${formState.pace}
 - 관심사: ${formState.interests.join(', ') || '없음'}
 - 여행 스타일: ${formState.tripStyle}
 
 ## 📋 일정 작성 규칙
 1. **숙소를 중심으로 한 효율적 동선 설계**
-2. **점심 후 ${formState.postLunchCafe ? '반드시' : '가능하면'} 카페 포함**
-3. **저녁식사는 ${formState.dinnerTravelTime} 기준으로 배치**
-4. **다음날 일정을 고려한 숙소 이동**
-5. **페이스에 따른 체류시간 조절**:
+2. **숙소 체크인 시간 고려 (매우 중요)**:
+   - 숙소 체크인은 일반적으로 15:00 이후 가능 (각 숙소 public_info에서 확인)
+   - ⚠️ 동선 효율성을 우선하고, 체크인은 자연스럽게 배치:
+     * 숙소가 관광 경로 중간에 위치 → 15:00 이후 편리한 시점에 체크인
+     * 숙소가 관광 경로 끝에 위치 → 저녁식사 후 마지막에 체크인
+   - 첫날: 도착 후 숙소 방향으로 이동하며 효율적인 동선 구성 (렌터카 짐 보관)
+   - 마지막날: 체크아웃 시간(일반적으로 11:00) 고려하여 출발 전 마무리
+3. **점심 후 ${formState.postLunchCafe ? '반드시' : '가능하면'} 카페 포함**
+4. **저녁식사 배치 규칙**:
+   ${formState.nextDayConsideration === 'same_day_finish'
+     ? '- 마지막 관광지, 저녁식사, 숙소를 모두 30분 내외로 배치'
+     : formState.dinnerStrategy === 'near_accommodation'
+       ? '- 숙소 근처에서 저녁식사 (다음날 동선 최적화)'
+       : '- 마지막 관광지 근처에서 저녁식사 후 숙소로 이동'
+   }
+5. **관심사 기반 스팟 선택 (매우 중요)**:
+   ${Object.entries(formState.interestWeights).map(([interest, weight]) =>
+     `- ${interest}: ${weight}% 비중으로 우선 선택`
+   ).join('\n   ')}
+
+   **각 관심사별 스팟 매칭 기준**:
+   - **자연**: interest_tags에 "자연" 포함 또는 view_info에서 nature_view/mountain_view true
+   - **오션뷰**: interest_tags에 "오션뷰" 포함 또는 view_info에서 ocean_view true
+   - **요즘 뜨는 핫플**: interest_tags에 "요즘핫플" 포함 또는 trend_info에서 trend_status "요즘핫플"
+   - **쇼핑 & 소품샵**: interest_tags에 "쇼핑" 포함 또는 shopping_info 데이터 존재
+   - **박물관 & 미술관**: interest_tags에 "박물관" 포함 또는 categories에 박물관/미술관 포함
+   - **역사 & 문화 유적**: interest_tags에 "역사" 포함 또는 cultural_info에서 historical_significance true
+   - **짜릿한 액티비티**: interest_tags에 "액티비티" 포함 또는 activity_info에서 activity_level "활동적"/"매우활동적"
+   - **걷기 좋은 길**: interest_tags에 "걷기" 포함 또는 activity_info에서 walking_required true
+6. **페이스에 따른 체류시간 조절**:
    - 여유롭게: 기본 시간 + 30%
    - 보통: 기본 시간
-   - 촘촘하게: 기본 시간 - 20%, 더 많은 스팟
+   - 촉촘하게: 기본 시간 - 20%, 더 많은 스팟
 
 다음 JSON 데이터의 스팟들만 사용해서 일정을 만들어주세요:
 
 ${spotData}
 `;
 
-      const result = await chat.sendMessage(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+
+      const text = response.text;
 
       setFinalItinerary(text);
     } catch (err) {
@@ -629,39 +645,69 @@ ${spotData}
 
               <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">저녁식사 이동 허용시간</label>
-                  <div className="space-y-2">
-                    {DINNER_TRAVEL_OPTIONS.map((option) => (
-                      <label key={option.value} className="flex items-center">
-                        <input
-                          type="radio"
-                          value={option.value}
-                          checked={formState.dinnerTravelTime === option.value}
-                          onChange={(e) => handleUpdateForm('dinnerTravelTime', e.target.value as any)}
-                          className="form-radio"
-                        />
-                        <span className="ml-2">{option.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">숙소 이동 고려사항</label>
+                  <div className="space-y-3">
+                    <label className="flex items-start">
+                      <input
+                        type="radio"
+                        value="same_day_finish"
+                        checked={formState.nextDayConsideration === 'same_day_finish'}
+                        onChange={(e) => handleUpdateForm('nextDayConsideration', e.target.value as any)}
+                        className="form-radio mt-1"
+                      />
+                      <div className="ml-2">
+                        <span className="font-medium">당일 동선 중시</span>
+                        <p className="text-sm text-gray-600 mt-1">마지막 관광지, 저녁식사, 숙소를 모두 30분 내외로 배치하여 편안한 마무리</p>
+                      </div>
+                    </label>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">숙소 이동 고려사항</label>
-                  <div className="space-y-2">
-                    {NEXT_DAY_OPTIONS.map((option) => (
-                      <label key={option.value} className="flex items-center">
+                    <label className="flex items-start">
+                      <input
+                        type="radio"
+                        value="next_day_start"
+                        checked={formState.nextDayConsideration === 'next_day_start'}
+                        onChange={(e) => handleUpdateForm('nextDayConsideration', e.target.value as any)}
+                        className="form-radio mt-1"
+                      />
+                      <div className="ml-2">
+                        <span className="font-medium">다음날 시작 중시</span>
+                        <p className="text-sm text-gray-600 mt-1">다음날 첫 관광지 근처에 숙소 배치 (저녁식사 위치 선택 가능)</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  {formState.nextDayConsideration === 'next_day_start' && (
+                    <div className="mt-4 ml-6 space-y-2 border-l-2 border-blue-200 pl-4">
+                      <p className="text-sm font-medium text-gray-700 mb-2">저녁식사 위치 선택:</p>
+                      <label className="flex items-start">
                         <input
                           type="radio"
-                          value={option.value}
-                          checked={formState.nextDayConsideration === option.value}
-                          onChange={(e) => handleUpdateForm('nextDayConsideration', e.target.value as any)}
-                          className="form-radio"
+                          value="near_accommodation"
+                          checked={formState.dinnerStrategy === 'near_accommodation'}
+                          onChange={(e) => handleUpdateForm('dinnerStrategy', e.target.value as any)}
+                          className="form-radio mt-1"
                         />
-                        <span className="ml-2">{option.label}</span>
+                        <div className="ml-2">
+                          <span className="text-sm">숙소 근처에서 저녁식사</span>
+                          <p className="text-xs text-gray-500">마지막 관광지 → (이동) → 숙소 근처 저녁식사</p>
+                        </div>
                       </label>
-                    ))}
-                  </div>
+
+                      <label className="flex items-start">
+                        <input
+                          type="radio"
+                          value="near_last_spot"
+                          checked={formState.dinnerStrategy === 'near_last_spot'}
+                          onChange={(e) => handleUpdateForm('dinnerStrategy', e.target.value as any)}
+                          className="form-radio mt-1"
+                        />
+                        <div className="ml-2">
+                          <span className="text-sm">마지막 관광지 근처에서 저녁식사</span>
+                          <p className="text-xs text-gray-500">마지막 관광지 → 근처 저녁식사 → (이동) → 숙소 🍻</p>
+                        </div>
+                      </label>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -730,10 +776,34 @@ ${spotData}
                       // Initialize weights for new interests
                       if (!formState.interests.includes(interest)) {
                         const newWeights = { ...formState.interestWeights };
-                        const avgWeight = Math.round(100 / (updated.length || 1) / 10) * 10;
+                        const avgWeight = Math.round(100 / updated.length / 10) * 10;
+
+                        // Reset all weights to ensure 100% total
                         updated.forEach(int => {
-                          if (!newWeights[int]) newWeights[int] = avgWeight;
+                          newWeights[int] = avgWeight;
                         });
+
+                        // Clean up weights for removed interests
+                        Object.keys(newWeights).forEach(key => {
+                          if (!updated.includes(key)) {
+                            delete newWeights[key];
+                          }
+                        });
+
+                        handleUpdateForm('interestWeights', newWeights);
+                      } else {
+                        // When removing an interest, redistribute weights
+                        const newWeights = { ...formState.interestWeights };
+                        const removedWeight = newWeights[interest] || 0;
+                        delete newWeights[interest];
+
+                        if (updated.length > 0) {
+                          const redistribution = Math.round(removedWeight / updated.length / 10) * 10;
+                          updated.forEach(int => {
+                            newWeights[int] = (newWeights[int] || 0) + redistribution;
+                          });
+                        }
+
                         handleUpdateForm('interestWeights', newWeights);
                       }
                     }}
@@ -760,6 +830,18 @@ ${spotData}
                         />
                       </div>
                     ))}
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">총 비중</span>
+                        <span className={`text-sm font-medium ${
+                          Object.values(formState.interestWeights).reduce((sum, weight) => sum + (weight || 0), 0) === 100
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                        }`}>
+                          {Object.values(formState.interestWeights).reduce((sum, weight) => sum + (weight || 0), 0)}%
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
 

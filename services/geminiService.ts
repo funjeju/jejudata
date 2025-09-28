@@ -4,7 +4,7 @@ import { findRegionByName, getRegionsByType } from '../data/csvRegionLoader';
 
 // The API key is sourced from the environment variable `process.env.API_KEY`.
 // It is assumed to be pre-configured and accessible in the execution environment.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 const regionsDescription = `The administrative/travel region in Jeju. Must be one of: 제주시 동(洞) 지역, 애월읍, 한림읍, 한경면, 대정읍, 조천읍, 구좌읍, 성산읍, 우도면, 서귀포시 동(洞) 지역, 안덕면, 남원읍, 표선면.`;
 
@@ -77,8 +77,70 @@ const draftGenerationSchema = {
             description: "Structured comments derived from the detailed expert description.",
             nullable: true,
         },
+        interest_tags: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "관심사 태그: '자연', '오션뷰', '핫플', '쇼핑', '박물관', '역사', '액티비티', '걷기' 중 해당되는 것들",
+            nullable: true,
+        },
+        view_info: {
+            type: Type.OBJECT,
+            properties: {
+                ocean_view: { type: Type.BOOLEAN, description: "바다뷰가 있는지" },
+                mountain_view: { type: Type.BOOLEAN, description: "산뷰/오름뷰가 있는지" },
+                city_view: { type: Type.BOOLEAN, description: "시티뷰가 있는지" },
+                nature_view: { type: Type.BOOLEAN, description: "자연뷰가 있는지" },
+            },
+            description: "뷰 정보",
+            nullable: true,
+        },
+        shopping_info: {
+            type: Type.OBJECT,
+            properties: {
+                has_souvenirs: { type: Type.BOOLEAN, description: "기념품 쇼핑 가능한지" },
+                has_local_products: { type: Type.BOOLEAN, description: "로컬 특산품 구매 가능한지" },
+                has_fashion: { type: Type.BOOLEAN, description: "패션/소품 쇼핑 가능한지" },
+                shopping_type: { type: Type.STRING, enum: ["대형몰", "로컬샵", "전통시장", "아울렛", "기타"], nullable: true },
+            },
+            description: "쇼핑 관련 정보",
+            nullable: true,
+        },
+        cultural_info: {
+            type: Type.OBJECT,
+            properties: {
+                historical_significance: { type: Type.BOOLEAN, description: "역사적 의미가 있는지" },
+                cultural_experience: { type: Type.BOOLEAN, description: "문화 체험이 가능한지" },
+                traditional_elements: { type: Type.BOOLEAN, description: "전통 요소가 있는지" },
+                modern_culture: { type: Type.BOOLEAN, description: "현대 문화 요소가 있는지" },
+            },
+            description: "문화/역사 관련 정보",
+            nullable: true,
+        },
+        activity_info: {
+            type: Type.OBJECT,
+            properties: {
+                activity_level: { type: Type.STRING, enum: ["휴식중심", "가벼운활동", "활동적", "매우활동적"], description: "활동 강도" },
+                walking_required: { type: Type.BOOLEAN, description: "걷기가 필요한지" },
+                physical_difficulty: { type: Type.STRING, enum: ["쉬움", "보통", "어려움"], description: "체력적 난이도" },
+                suitable_for_kids: { type: Type.BOOLEAN, description: "아이들과 함께 가기 좋은지" },
+                suitable_for_elderly: { type: Type.BOOLEAN, description: "어르신들과 함께 가기 좋은지" },
+            },
+            description: "액티비티 관련 정보",
+            nullable: true,
+        },
+        trend_info: {
+            type: Type.OBJECT,
+            properties: {
+                trend_status: { type: Type.STRING, enum: ["클래식", "꾸준인기", "요즘핫플", "숨은명소"], description: "트렌드 상태" },
+                popularity_level: { type: Type.STRING, enum: ["한적함", "보통", "인기", "매우인기"], description: "인기도" },
+                sns_hotspot: { type: Type.BOOLEAN, description: "SNS에서 인기인지" },
+                instagram_worthy: { type: Type.BOOLEAN, description: "인스타그램 포토스팟인지" },
+            },
+            description: "트렌드/인기도 정보",
+            nullable: true,
+        },
     },
-    required: ["place_name", "attributes", "expert_tip_final"]
+    required: ["place_name", "attributes", "expert_tip_final", "interest_tags"]
 };
 
 
@@ -219,14 +281,32 @@ You are an AI data assistant for Jeju DB, a Jeju travel platform. Your goal is t
     *   **attributes**: Use both expert description and search results to determine target audience, seasons, accessibility, etc.
     *   **public_info**: Prioritize search results for current operating hours, contact information, and practical details.
     *   **category_specific_info**: For restaurants/cafes, include price ranges and signature items from search results.
+    *   **관심사 분류 (CRITICAL)**: Analyze the content and classify according to these specific interest categories:
+        - **자연**: 오름, 해변, 숲, 공원, 자연경관, 야외활동 공간
+        - **오션뷰**: 바다가 보이는 카페/식당/숙소, 해안가 명소, 일몰/일출 명소
+        - **요즘핫플**: SNS 핫플레이스, 인스타그램 명소, 최근 오픈한 곳, 젊은층 인기
+        - **쇼핑**: 기념품샵, 로컬 특산품, 패션샵, 전통시장, 쇼핑몰
+        - **박물관**: 박물관, 미술관, 갤러리, 전시공간
+        - **역사**: 역사유적, 전통문화, 문화재, 옛 건축물
+        - **액티비티**: 체험활동, 스포츠, 어드벤처, 워터스포츠
+        - **걷기**: 올레길, 산책로, 트레킹 코스, 도보여행 적합한 곳
 
-5.  **Quality Guidelines**:
+5.  **상세 분류 지침**:
+    *   **interest_tags**: 위 8개 카테고리 중 해당되는 모든 태그를 배열로 포함 (복수 선택 가능)
+    *   **view_info**: 설명에서 뷰 관련 언급이 있는지 정확히 분석
+    *   **activity_info**: 체력 요구도, 걷기 필요성, 연령대 적합성을 정확히 판단
+    *   **trend_info**: SNS 언급, 최신 트렌드, 인기도를 종합적으로 분석
+    *   **shopping_info**: 쇼핑 가능 항목을 구체적으로 분류
+    *   **cultural_info**: 역사적/문화적 요소를 세분화하여 분석
+
+6.  **Quality Guidelines**:
     - Ensure expert insights are preserved and highlighted
     - Add practical details from search results where they enhance user experience
     - Resolve any conflicts by favoring expert description for subjective matters and search results for factual information
     - Make the final content comprehensive yet readable
+    - **MANDATORY**: Every spot must have properly classified interest_tags based on content analysis
 
-6.  **Output**: Return ONLY the generated JSON object that conforms to the schema. The spot name in the JSON should be exactly "${formData.spotName}".
+7.  **Output**: Return ONLY the generated JSON object that conforms to the schema. The spot name in the JSON should be exactly "${formData.spotName}".
 `;
     try {
         const response = await ai.models.generateContent({

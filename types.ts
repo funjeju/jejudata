@@ -33,6 +33,43 @@ export interface CategorySpecificInfo {
   difficulty?: string;
 }
 
+// 관심사 매핑을 위한 새로운 인터페이스들
+export interface ViewInfo {
+  ocean_view: boolean;
+  mountain_view: boolean;
+  city_view: boolean;
+  nature_view: boolean;
+}
+
+export interface ShoppingInfo {
+  has_souvenirs: boolean;
+  has_local_products: boolean;
+  has_fashion: boolean;
+  shopping_type?: "대형몰" | "로컬샵" | "전통시장" | "아울렛" | "기타";
+}
+
+export interface CulturalInfo {
+  historical_significance: boolean;
+  cultural_experience: boolean;
+  traditional_elements: boolean;
+  modern_culture: boolean;
+}
+
+export interface ActivityInfo {
+  activity_level: "휴식중심" | "가벼운활동" | "활동적" | "매우활동적";
+  walking_required: boolean;
+  physical_difficulty: "쉬움" | "보통" | "어려움";
+  suitable_for_kids: boolean;
+  suitable_for_elderly: boolean;
+}
+
+export interface TrendInfo {
+  trend_status: "클래식" | "꾸준인기" | "요즘핫플" | "숨은명소";
+  popularity_level: "한적함" | "보통" | "인기" | "매우인기";
+  sns_hotspot: boolean;
+  instagram_worthy: boolean;
+}
+
 export interface Comment {
   type: string;
   content: string;
@@ -91,6 +128,14 @@ export interface Place {
   public_info?: PublicInfo | null;
   tags?: string[] | null;
   import_url?: string;
+
+  // 관심사 매핑을 위한 새로운 필드들
+  interest_tags?: string[] | null; // ["자연", "오션뷰", "핫플", "쇼핑", "박물관", "역사", "액티비티", "걷기"]
+  view_info?: ViewInfo | null;
+  shopping_info?: ShoppingInfo | null;
+  cultural_info?: CulturalInfo | null;
+  activity_info?: ActivityInfo | null;
+  trend_info?: TrendInfo | null;
 
   // For collaboration and versioning
   suggestions?: Record<string, Suggestion[]>;

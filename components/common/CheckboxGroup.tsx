@@ -9,6 +9,7 @@ interface CheckboxGroupProps {
   onChange: (option: string) => void;
   baseOption?: string;
   className?: string;
+  onSelectAll?: (allOptions: string[]) => void;
 }
 
 const CheckboxGroup: React.FC<CheckboxGroupProps> = ({
@@ -18,9 +19,22 @@ const CheckboxGroup: React.FC<CheckboxGroupProps> = ({
   selectedOptions,
   onChange,
   baseOption,
-  className = ''
+  className = '',
+  onSelectAll
 }) => {
   const isBaseSelected = baseOption ? selectedOptions.includes(baseOption) : false;
+
+  const handleBaseOptionClick = (option: string) => {
+    if (option === baseOption && onSelectAll) {
+      // baseOption 클릭 시 전체 선택
+      const allOptions = optionGroups
+        ? Object.values(optionGroups).flat()
+        : options || [];
+      onSelectAll(allOptions);
+    } else {
+      onChange(option);
+    }
+  };
 
   const renderCheckboxes = (opts: string[]) => (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
@@ -33,7 +47,7 @@ const CheckboxGroup: React.FC<CheckboxGroupProps> = ({
             type="checkbox"
             className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
             checked={selectedOptions.includes(option)}
-            onChange={() => onChange(option)}
+            onChange={() => handleBaseOptionClick(option)}
           />
           <span className="text-sm text-gray-800">{option}</span>
         </label>

@@ -262,21 +262,23 @@ const ReviewDashboard: React.FC<ReviewDashboardProps> = ({ initialData, onSave, 
                  </div>
               </div>
               <div className="mt-6">
-                <CheckboxGroup 
-                    label="추천 대상" 
+                <CheckboxGroup
+                    label="추천 대상"
                     optionGroups={TARGET_AUDIENCE_GROUPS}
                     baseOption="누구나"
-                    selectedOptions={data.attributes.targetAudience} 
-                    onChange={opt => handleAttributeChange('targetAudience', data.attributes.targetAudience.includes(opt) ? data.attributes.targetAudience.filter(o => o !== opt) : [...data.attributes.targetAudience, opt])} 
+                    selectedOptions={data.attributes.targetAudience}
+                    onChange={opt => handleAttributeChange('targetAudience', data.attributes.targetAudience.includes(opt) ? data.attributes.targetAudience.filter(o => o !== opt) : [...data.attributes.targetAudience, opt])}
+                    onSelectAll={allOptions => handleAttributeChange('targetAudience', allOptions)}
                 />
               </div>
               <div className="mt-6">
-                <CheckboxGroup 
-                    label="추천 시즌" 
+                <CheckboxGroup
+                    label="추천 시즌"
                     optionGroups={RECOMMENDED_SEASONS_GROUPS}
                     baseOption="아무때나"
-                    selectedOptions={data.attributes.recommendedSeasons} 
-                    onChange={opt => handleAttributeChange('recommendedSeasons', data.attributes.recommendedSeasons.includes(opt) ? data.attributes.recommendedSeasons.filter(o => o !== opt) : [...data.attributes.recommendedSeasons, opt])} 
+                    selectedOptions={data.attributes.recommendedSeasons}
+                    onChange={opt => handleAttributeChange('recommendedSeasons', data.attributes.recommendedSeasons.includes(opt) ? data.attributes.recommendedSeasons.filter(o => o !== opt) : [...data.attributes.recommendedSeasons, opt])}
+                    onSelectAll={allOptions => handleAttributeChange('recommendedSeasons', allOptions)}
                 />
               </div>
             </Card>
@@ -289,6 +291,244 @@ const ReviewDashboard: React.FC<ReviewDashboardProps> = ({ initialData, onSave, 
               <Textarea label="AI 정제 TIP (수정 가능)" value={data.expert_tip_final || ''} onChange={e => handleInputChange('expert_tip_final', e.target.value)} rows={5} />
             </div>
           </Card>
+
+          {/* 관심사 태그 */}
+          <Card>
+            <h3 className="font-semibold text-lg mb-4">🎯 관심사 분류</h3>
+            <div className="space-y-4">
+              <CheckboxGroup
+                label="관심사 태그"
+                options={["자연", "오션뷰", "요즘핫플", "쇼핑", "박물관", "역사", "액티비티", "걷기"]}
+                selectedOptions={data.interest_tags || []}
+                onChange={(tag) => {
+                  const updated = data.interest_tags?.includes(tag)
+                    ? data.interest_tags.filter(t => t !== tag)
+                    : [...(data.interest_tags || []), tag];
+                  handleInputChange('interest_tags', updated);
+                }}
+              />
+            </div>
+          </Card>
+
+          {/* 뷰 정보 */}
+          <Card>
+            <h3 className="font-semibold text-lg mb-4">🌅 뷰 정보</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={data.view_info?.ocean_view || false}
+                  onChange={e => handleInputChange('view_info', {...(data.view_info || {}), ocean_view: e.target.checked})}
+                  className="form-checkbox mr-2"
+                />
+                바다뷰
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={data.view_info?.mountain_view || false}
+                  onChange={e => handleInputChange('view_info', {...(data.view_info || {}), mountain_view: e.target.checked})}
+                  className="form-checkbox mr-2"
+                />
+                산뷰/오름뷰
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={data.view_info?.city_view || false}
+                  onChange={e => handleInputChange('view_info', {...(data.view_info || {}), city_view: e.target.checked})}
+                  className="form-checkbox mr-2"
+                />
+                시티뷰
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={data.view_info?.nature_view || false}
+                  onChange={e => handleInputChange('view_info', {...(data.view_info || {}), nature_view: e.target.checked})}
+                  className="form-checkbox mr-2"
+                />
+                자연뷰
+              </label>
+            </div>
+          </Card>
+
+          {/* 액티비티 정보 */}
+          <Card>
+            <h3 className="font-semibold text-lg mb-4">🏃 액티비티 정보</h3>
+            <div className="space-y-4">
+              <Select
+                label="활동 강도"
+                value={data.activity_info?.activity_level || ''}
+                onChange={e => handleInputChange('activity_info', {...(data.activity_info || {}), activity_level: e.target.value})}
+                options={["휴식중심", "가벼운활동", "활동적", "매우활동적"]}
+              />
+              <Select
+                label="체력적 난이도"
+                value={data.activity_info?.physical_difficulty || ''}
+                onChange={e => handleInputChange('activity_info', {...(data.activity_info || {}), physical_difficulty: e.target.value})}
+                options={["쉬움", "보통", "어려움"]}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={data.activity_info?.walking_required || false}
+                    onChange={e => handleInputChange('activity_info', {...(data.activity_info || {}), walking_required: e.target.checked})}
+                    className="form-checkbox mr-2"
+                  />
+                  걷기 필요
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={data.activity_info?.suitable_for_kids || false}
+                    onChange={e => handleInputChange('activity_info', {...(data.activity_info || {}), suitable_for_kids: e.target.checked})}
+                    className="form-checkbox mr-2"
+                  />
+                  아이 동반 적합
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={data.activity_info?.suitable_for_elderly || false}
+                    onChange={e => handleInputChange('activity_info', {...(data.activity_info || {}), suitable_for_elderly: e.target.checked})}
+                    className="form-checkbox mr-2"
+                  />
+                  어르신 동반 적합
+                </label>
+              </div>
+            </div>
+          </Card>
+
+          {/* 트렌드 정보 */}
+          <Card>
+            <h3 className="font-semibold text-lg mb-4">📱 트렌드 & 인기도</h3>
+            <div className="space-y-4">
+              <Select
+                label="트렌드 상태"
+                value={data.trend_info?.trend_status || ''}
+                onChange={e => handleInputChange('trend_info', {...(data.trend_info || {}), trend_status: e.target.value})}
+                options={["클래식", "꾸준인기", "요즘핫플", "숨은명소"]}
+              />
+              <Select
+                label="인기도"
+                value={data.trend_info?.popularity_level || ''}
+                onChange={e => handleInputChange('trend_info', {...(data.trend_info || {}), popularity_level: e.target.value})}
+                options={["한적함", "보통", "인기", "매우인기"]}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={data.trend_info?.sns_hotspot || false}
+                    onChange={e => handleInputChange('trend_info', {...(data.trend_info || {}), sns_hotspot: e.target.checked})}
+                    className="form-checkbox mr-2"
+                  />
+                  SNS 핫스팟
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={data.trend_info?.instagram_worthy || false}
+                    onChange={e => handleInputChange('trend_info', {...(data.trend_info || {}), instagram_worthy: e.target.checked})}
+                    className="form-checkbox mr-2"
+                  />
+                  인스타그램 포토스팟
+                </label>
+              </div>
+            </div>
+          </Card>
+
+          {/* 쇼핑 정보 */}
+          {(data.interest_tags?.includes('쇼핑') || data.categories?.some(cat => cat.includes('쇼핑') || cat.includes('상점'))) && (
+            <Card>
+              <h3 className="font-semibold text-lg mb-4">🛍️ 쇼핑 정보</h3>
+              <div className="space-y-4">
+                <Select
+                  label="쇼핑 타입"
+                  value={data.shopping_info?.shopping_type || ''}
+                  onChange={e => handleInputChange('shopping_info', {...(data.shopping_info || {}), shopping_type: e.target.value})}
+                  options={["대형몰", "로컬샵", "전통시장", "아울렛", "기타"]}
+                />
+                <div className="grid grid-cols-3 gap-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={data.shopping_info?.has_souvenirs || false}
+                      onChange={e => handleInputChange('shopping_info', {...(data.shopping_info || {}), has_souvenirs: e.target.checked})}
+                      className="form-checkbox mr-2"
+                    />
+                    기념품
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={data.shopping_info?.has_local_products || false}
+                      onChange={e => handleInputChange('shopping_info', {...(data.shopping_info || {}), has_local_products: e.target.checked})}
+                      className="form-checkbox mr-2"
+                    />
+                    로컬 특산품
+                  </label>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={data.shopping_info?.has_fashion || false}
+                      onChange={e => handleInputChange('shopping_info', {...(data.shopping_info || {}), has_fashion: e.target.checked})}
+                      className="form-checkbox mr-2"
+                    />
+                    패션/소품
+                  </label>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* 문화/역사 정보 */}
+          {(data.interest_tags?.includes('역사') || data.interest_tags?.includes('박물관') ||
+            data.categories?.some(cat => cat.includes('문화') || cat.includes('역사') || cat.includes('박물관'))) && (
+            <Card>
+              <h3 className="font-semibold text-lg mb-4">🏛️ 문화/역사 정보</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={data.cultural_info?.historical_significance || false}
+                    onChange={e => handleInputChange('cultural_info', {...(data.cultural_info || {}), historical_significance: e.target.checked})}
+                    className="form-checkbox mr-2"
+                  />
+                  역사적 의미
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={data.cultural_info?.cultural_experience || false}
+                    onChange={e => handleInputChange('cultural_info', {...(data.cultural_info || {}), cultural_experience: e.target.checked})}
+                    className="form-checkbox mr-2"
+                  />
+                  문화 체험
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={data.cultural_info?.traditional_elements || false}
+                    onChange={e => handleInputChange('cultural_info', {...(data.cultural_info || {}), traditional_elements: e.target.checked})}
+                    className="form-checkbox mr-2"
+                  />
+                  전통 요소
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={data.cultural_info?.modern_culture || false}
+                    onChange={e => handleInputChange('cultural_info', {...(data.cultural_info || {}), modern_culture: e.target.checked})}
+                    className="form-checkbox mr-2"
+                  />
+                  현대 문화
+                </label>
+              </div>
+            </Card>
+          )}
 
         </div>
         

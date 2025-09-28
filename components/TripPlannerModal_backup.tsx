@@ -8,7 +8,7 @@ import Input from './common/Input';
 import Select from './common/Select';
 
 // The API key is sourced from the environment variable `process.env.API_KEY`.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 // --- New 4-Step Type Definitions ---
 interface TripPlanFormState {
