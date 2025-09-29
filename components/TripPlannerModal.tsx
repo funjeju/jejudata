@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import type { Place, FixedSpot } from '../types';
+import type { Place, FixedSpot, OroomData } from '../types';
 import Modal from './common/Modal';
 import Button from './common/Button';
 import Input from './common/Input';
@@ -177,9 +177,10 @@ interface TripPlannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   spots: Place[];
+  orooms: OroomData[];
 }
 
-const TripPlannerModal: React.FC<TripPlannerModalProps> = ({ isOpen, onClose, spots }) => {
+const TripPlannerModal: React.FC<TripPlannerModalProps> = ({ isOpen, onClose, spots, orooms }) => {
   const [formState, setFormState] = useState<TripPlanFormState>(initialFormState);
   const [currentStep, setCurrentStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -301,6 +302,7 @@ const TripPlannerModal: React.FC<TripPlannerModalProps> = ({ isOpen, onClose, sp
     try {
       const totalHours = calculateTotalHours();
       const spotData = JSON.stringify(spots, null, 2);
+      const oroomData = JSON.stringify(orooms, null, 2);
 
       const prompt = `
 다음 정보를 바탕으로 제주도 여행 일정을 작성해주세요:
@@ -398,9 +400,15 @@ ${formState.fixedRestaurants.length > 0 ?
    - 보통: 기본 시간
    - 촉촘하게: 기본 시간 - 20%, 더 많은 스팟
 
-다음 JSON 데이터의 스팟들만 사용해서 일정을 만들어주세요:
+## 📍 이용 가능한 데이터
 
+### 1. 여행 스팟 데이터 (카페, 식당, 관광지, 숙소 등)
 ${spotData}
+
+### 2. 오름 데이터 (제주 화산체 정보)
+${oroomData}
+
+**⚠️ 중요: 위 데이터에 포함된 장소들만 사용해서 일정을 작성해주세요.**
 `;
 
       const response = await ai.models.generateContent({

@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import type { Place, InitialFormData, Suggestion, EditLog, WeatherSource } from './types';
+import type { Place, InitialFormData, Suggestion, EditLog, WeatherSource, OroomData } from './types';
 import CategoryForm from './components/CategoryForm';
 import InitialForm from './components/InitialForm';
 import ReviewDashboard from './components/ReviewDashboard';
@@ -65,7 +65,9 @@ const App: React.FC = () => {
   const [isTripPlannerOpen, setIsTripPlannerOpen] = useState(false);
   const [isOroomDBOpen, setIsOroomDBOpen] = useState(false);
   const [weatherSources, setWeatherSources] = useState<WeatherSource[]>([]);
+  const [orooms, setOrooms] = useState<OroomData[]>([]);
   const [isLoadingSpots, setIsLoadingSpots] = useState(true);
+  const [isLoadingOrooms, setIsLoadingOrooms] = useState(true);
 // 스팟 데이터 실시간 리스너
   useEffect(() => {
     console.log('Firestore 실시간 리스너 설정 중...');
@@ -82,6 +84,36 @@ const App: React.FC = () => {
       console.error('Error in spots listener:', error);
       setSpots([]);
       setIsLoadingSpots(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 오름 데이터 실시간 리스너
+  useEffect(() => {
+    console.log('Orooms Firestore 실시간 리스너 설정 중...');
+    const q = query(collection(db, "orooms"));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const oroomsArray: OroomData[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        // Firestore Timestamp를 Date로 변환
+        if (data.createdAt && typeof data.createdAt.toDate === 'function') {
+          data.createdAt = data.createdAt.toDate();
+        }
+        if (data.updatedAt && typeof data.updatedAt.toDate === 'function') {
+          data.updatedAt = data.updatedAt.toDate();
+        }
+        oroomsArray.push({ id: doc.id, ...data } as OroomData);
+      });
+      setOrooms(oroomsArray);
+      setIsLoadingOrooms(false);
+      console.log(`Firestore에서 실시간으로 ${oroomsArray.length}개의 오름을 불러왔습니다.`);
+    }, (error) => {
+      console.error('Error in orooms listener:', error);
+      setOrooms([]);
+      setIsLoadingOrooms(false);
     });
 
     return () => unsubscribe();
@@ -775,6 +807,7 @@ const App: React.FC = () => {
             isOpen={isChatbotOpen}
             onClose={() => setIsChatbotOpen(false)}
             spots={spots}
+            orooms={orooms}
             onNavigateToSpot={handleNavigateFromChatbot}
         />
 
@@ -790,6 +823,7 @@ const App: React.FC = () => {
           isOpen={isTripPlannerOpen}
           onClose={() => setIsTripPlannerOpen(false)}
           spots={spots}
+          orooms={orooms}
         />
 
         <OroomDBModal

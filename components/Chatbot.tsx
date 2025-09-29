@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
-import type { Place, UserLocation } from '../types';
+import type { Place, UserLocation, OroomData } from '../types';
 import Button from './common/Button';
 import LocationPermissionModal from './LocationPermissionModal';
 import { getCurrentLocation, getLocationErrorMessage, formatLocationForDisplay } from '../utils/locationUtils';
@@ -12,6 +12,7 @@ interface ChatbotProps {
   isOpen: boolean;
   onClose: () => void;
   spots: Place[];
+  orooms: OroomData[];
   onNavigateToSpot: (placeId: string) => void;
 }
 
@@ -28,7 +29,7 @@ interface Message {
 }
 
 
-const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToSpot }) => {
+const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, orooms, onNavigateToSpot }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -53,10 +54,10 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
       setUserLocation(location);
       setIsLocationModalOpen(false);
 
-      // 위치 정보가 반영되었다는 메시지 추가
+      // 위치 정보가 반영되었다는 메시지 추가 (디버깅 정보 포함)
       setMessages(prev => [...prev, {
         role: 'ai',
-        content: `📍 현재 위치가 반영되었습니다!\n${formatLocationForDisplay(location)}\n\n이제 위치 기반 맞춤 추천을 제공할 수 있습니다. 무엇을 도와드릴까요?`
+        content: `📍 현재 위치가 반영되었습니다!\n${formatLocationForDisplay(location)}\n정확도: ${location.accuracy?.toFixed(0)}m\n측정시간: ${new Date(location.timestamp).toLocaleString()}\n\n⚠️ 위치가 정확하지 않다면 실외에서 다시 시도해주세요.\n\n이제 위치 기반 맞춤 추천을 제공할 수 있습니다. 무엇을 도와드릴까요?`
       }]);
     } catch (error: any) {
       alert(getLocationErrorMessage(error));
@@ -140,9 +141,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
       currentInput.includes('거리')
     );
 
-    // 위치 기반 질문이면 가까운 스팟들만 필터링
+    // 위치 기반 질문이면 가까운 스팟들과 오름들만 필터링
     let relevantSpots = spots;
+    let relevantOrooms = orooms;
+
     if (isLocationBasedQuery && userLocation) {
+      // 스팟 필터링
       relevantSpots = spots
         .filter(spot => spot.gps?.latitude && spot.gps?.longitude)
         .map(spot => {
@@ -153,7 +157,20 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
           return { ...spot, distance };
         })
         .sort((a, b) => a.distance - b.distance)
-        .slice(0, 10); // 가장 가까운 10개만
+        .slice(0, 8); // 가장 가까운 8개만
+
+      // 오름 필터링
+      relevantOrooms = orooms
+        .filter(oroom => oroom.latitude && oroom.longitude)
+        .map(oroom => {
+          const distance = Math.sqrt(
+            Math.pow(userLocation.latitude - oroom.latitude!, 2) +
+            Math.pow(userLocation.longitude - oroom.longitude!, 2)
+          ) * 111; // 대략적인 km 계산
+          return { ...oroom, distance };
+        })
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 5); // 가장 가까운 5개만
     }
 
     const locationContext = userLocation ? `
@@ -167,12 +184,18 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
     ` : '';
 
     const promptWithContext = `
-        # AVAILABLE DATA (Jeju travel spots)
+        # AVAILABLE DATA (Jeju travel data)
         Here is the JSON data you can use to answer travel-related questions. For general conversation, you do not need to use this data.
-        ${isLocationBasedQuery ? '# FILTERED NEARBY SPOTS (within reasonable distance)' : '# ALL AVAILABLE SPOTS'}
+        ${isLocationBasedQuery ? '# FILTERED NEARBY DATA (within reasonable distance)' : '# ALL AVAILABLE DATA'}
 
+        ## TRAVEL SPOTS (카페, 식당, 관광지 등)
         \`\`\`json
         ${JSON.stringify(relevantSpots, null, 2)}
+        \`\`\`
+
+        ## VOLCANIC CONES (오름 정보)
+        \`\`\`json
+        ${JSON.stringify(relevantOrooms, null, 2)}
         \`\`\`
         ${locationContext}
         # USER'S QUESTION
