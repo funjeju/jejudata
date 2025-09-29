@@ -5,6 +5,14 @@ export interface Geopoint {
   longitude: number;
 }
 
+// 사용자 위치 정보 타입
+export interface UserLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  timestamp: number;
+}
+
 // A virtual representation of Firestore's Timestamp
 export interface Timestamp {
   seconds: number;

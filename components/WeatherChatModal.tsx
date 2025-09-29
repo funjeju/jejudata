@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
-import type { WeatherSource, WeatherCardData } from '../types';
+import type { WeatherSource, WeatherCardData, UserLocation } from '../types';
 import Modal from './common/Modal';
 import Button from './common/Button';
 import AddWeatherSourceModal from './AddWeatherSourceModal';
 import WeatherSourceListModal from './WeatherSourceListModal';
 import WeatherCard from './WeatherCard';
 import LiveWeatherViewModal from './LiveWeatherViewModal';
+import LocationPermissionModal from './LocationPermissionModal';
 import { captureWeatherScene, analyzeThumbnailsBatch, type VisualAnalysisResult, type BatchAnalysisProgress } from '../services/youtubeCapture';
 import { findNearbySources } from '../utils/geoUtils';
 import { findRegionByName, findNearestRegion, loadAllRegions } from '../data/csvRegionLoader';
 import { calculateDistance, formatDistance } from '../utils/gpsUtils';
+import { getCurrentLocation, getLocationErrorMessage, formatLocationForDisplay } from '../utils/locationUtils';
 
 // 유튜브 URL 감지 함수 (더 관대한 버전)
 const isYouTubeUrl = (url: string): boolean => {
@@ -105,15 +107,56 @@ const WeatherChatModal: React.FC<WeatherChatModalProps> = ({ isOpen, onClose, we
   const [isListModalOpen, setIsListModalOpen] = useState(false);
   const [isLiveViewOpen, setIsLiveViewOpen] = useState(false);
   const [sourceToEdit, setSourceToEdit] = useState<WeatherSource | null>(null);
-  
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [chat, setChat] = useState<Chat | null>(null);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isLocationLoading, setIsLocationLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleLocationRequest = () => {
+    setIsLocationModalOpen(true);
+  };
+
+  const handleAllowLocation = async () => {
+    setIsLocationLoading(true);
+    try {
+      const location = await getCurrentLocation();
+      setUserLocation(location);
+      setIsLocationModalOpen(false);
+
+      // 사용자 위치 기반으로 가장 가까운 CCTV 찾기
+      const nearestCCTVs = findNearestCCTVs('', 3, location.latitude, location.longitude);
+
+      if (nearestCCTVs.length > 0) {
+        setMessages(prev => [...prev, {
+          role: 'ai',
+          content: `📍 현재 위치가 반영되었습니다!\n${formatLocationForDisplay(location)}\n\n가장 가까운 실시간 CCTV ${nearestCCTVs.length}개를 찾았습니다:`,
+          cctvOptions: nearestCCTVs.map(cctv => ({
+            id: cctv.id,
+            title: cctv.title,
+            distance: formatDistance(cctv.distance),
+            gps: `${cctv.latitude?.toFixed(4)}, ${cctv.longitude?.toFixed(4)}`
+          }))
+        } as any]);
+      } else {
+        setMessages(prev => [...prev, {
+          role: 'ai',
+          content: `📍 현재 위치가 반영되었습니다!\n${formatLocationForDisplay(location)}\n\n주변에 등록된 CCTV가 없습니다. 지역명을 말씀해주시면 날씨 정보를 확인해드리겠습니다.`
+        }]);
+      }
+    } catch (error: any) {
+      alert(getLocationErrorMessage(error));
+    } finally {
+      setIsLocationLoading(false);
+    }
   };
 
   // GPS 기반으로 가장 가까운 CCTV 3개 찾기
@@ -735,7 +778,26 @@ ${source.weatherData ? `
 
   return (
     <>
-      <Modal isOpen={isOpen} onClose={onClose} title="제주실시간날씨전용챗봇">
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={
+          <div className="flex items-center gap-3">
+            <span>제주실시간날씨전용챗봇</span>
+            <button
+              onClick={handleLocationRequest}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                userLocation
+                  ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+              }`}
+              title={userLocation ? '위치 정보 반영됨' : '내 위치 반영하기'}
+            >
+              {userLocation ? '📍 위치 반영됨' : '📍 내 위치 반영'}
+            </button>
+          </div>
+        }
+      >
         <div className="flex flex-col h-[70vh] max-h-[600px]">
           <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b gap-y-2">
             <h4 className="text-lg font-semibold text-gray-700">정보 소스 관리</h4>
@@ -744,8 +806,8 @@ ${source.weatherData ? `
               <Button onClick={handleOpenAddModal} size="normal">
                 영상 주소 입력하기
               </Button>
-              <Button 
-                onClick={() => setIsLiveViewOpen(true)} 
+              <Button
+                onClick={() => setIsLiveViewOpen(true)}
                 className="bg-sky-500 text-white hover:bg-sky-600 focus:ring-sky-400"
               >
                 실시간 영상으로 날씨보기
@@ -859,6 +921,13 @@ ${source.weatherData ? `
         isOpen={isLiveViewOpen}
         onClose={() => setIsLiveViewOpen(false)}
         sources={weatherSources}
+      />
+
+      <LocationPermissionModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        onAllowLocation={handleAllowLocation}
+        isLoading={isLocationLoading}
       />
     </>
   );

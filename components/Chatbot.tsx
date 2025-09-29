@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
-import type { Place } from '../types';
+import type { Place, UserLocation } from '../types';
 import Button from './common/Button';
+import LocationPermissionModal from './LocationPermissionModal';
+import { getCurrentLocation, getLocationErrorMessage, formatLocationForDisplay } from '../utils/locationUtils';
 
 // The API key is sourced from the environment variable `process.env.API_KEY`.
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
@@ -31,10 +33,36 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [chat, setChat] = useState<Chat | null>(null);
+  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [isLocationLoading, setIsLocationLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleLocationRequest = () => {
+    setIsLocationModalOpen(true);
+  };
+
+  const handleAllowLocation = async () => {
+    setIsLocationLoading(true);
+    try {
+      const location = await getCurrentLocation();
+      setUserLocation(location);
+      setIsLocationModalOpen(false);
+
+      // 위치 정보가 반영되었다는 메시지 추가
+      setMessages(prev => [...prev, {
+        role: 'ai',
+        content: `📍 현재 위치가 반영되었습니다!\n${formatLocationForDisplay(location)}\n\n이제 위치 기반 맞춤 추천을 제공할 수 있습니다. 무엇을 도와드릴까요?`
+      }]);
+    } catch (error: any) {
+      alert(getLocationErrorMessage(error));
+    } finally {
+      setIsLocationLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -102,14 +130,51 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
     setInputValue('');
     setIsLoading(true);
 
+    // 위치 기반 질문인지 확인
+    const isLocationBasedQuery = userLocation && (
+      currentInput.includes('가까운') ||
+      currentInput.includes('근처') ||
+      currentInput.includes('주변') ||
+      currentInput.includes('바다') ||
+      currentInput.includes('숙소') ||
+      currentInput.includes('거리')
+    );
+
+    // 위치 기반 질문이면 가까운 스팟들만 필터링
+    let relevantSpots = spots;
+    if (isLocationBasedQuery && userLocation) {
+      relevantSpots = spots
+        .filter(spot => spot.gps?.latitude && spot.gps?.longitude)
+        .map(spot => {
+          const distance = Math.sqrt(
+            Math.pow(userLocation.latitude - spot.gps!.latitude, 2) +
+            Math.pow(userLocation.longitude - spot.gps!.longitude, 2)
+          ) * 111; // 대략적인 km 계산
+          return { ...spot, distance };
+        })
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 10); // 가장 가까운 10개만
+    }
+
+    const locationContext = userLocation ? `
+        # USER'S CURRENT LOCATION
+        The user has shared their current location:
+        - Latitude: ${userLocation.latitude}
+        - Longitude: ${userLocation.longitude}
+        - Accuracy: ${userLocation.accuracy}m
+
+        Use this information to provide location-based recommendations and calculate distances to nearby spots.
+    ` : '';
+
     const promptWithContext = `
         # AVAILABLE DATA (Jeju travel spots)
         Here is the JSON data you can use to answer travel-related questions. For general conversation, you do not need to use this data.
+        ${isLocationBasedQuery ? '# FILTERED NEARBY SPOTS (within reasonable distance)' : '# ALL AVAILABLE SPOTS'}
 
         \`\`\`json
-        ${JSON.stringify(spots, null, 2)}
+        ${JSON.stringify(relevantSpots, null, 2)}
         \`\`\`
-
+        ${locationContext}
         # USER'S QUESTION
         ${currentInput}
     `;
@@ -179,9 +244,22 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
     <div className="fixed bottom-24 right-6 w-[90vw] max-w-md h-[70vh] max-h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col z-50 transition-transform transform-gpu">
       <header className="flex items-center justify-between p-4 border-b bg-gray-50 rounded-t-2xl">
         <h3 className="text-lg font-bold text-gray-800">Jeju DB AI 어시스턴트</h3>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-800" aria-label="Close chat">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleLocationRequest}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              userLocation
+                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+            }`}
+            title={userLocation ? '위치 정보 반영됨' : '내 위치 반영하기'}
+          >
+            {userLocation ? '📍 위치 반영됨' : '📍 내 위치 반영'}
+          </button>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800" aria-label="Close chat">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
       </header>
       
       <main className="flex-1 p-4 overflow-y-auto bg-gray-100">
@@ -248,6 +326,13 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, onNavigateToS
           </Button>
         </div>
       </footer>
+
+      <LocationPermissionModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        onAllowLocation={handleAllowLocation}
+        isLoading={isLocationLoading}
+      />
     </div>
   );
 };
