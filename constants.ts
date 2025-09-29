@@ -1,8 +1,8 @@
 import React from 'react';
 
 export const CATEGORIES = [
-  "오름", "바다", "숲길", "올레길", "관광지", 
-  "포토존", "식당", "카페", "체험", "꽃", "역사문화"
+  "오름", "바다", "숲길", "올레길", "관광지",
+  "포토존", "식당", "카페", "체험", "꽃", "역사문화", "숙소"
 ];
 
 export const TARGET_AUDIENCE_GROUPS: Record<string, string[]> = {
@@ -27,6 +27,14 @@ export const PARKING_DIFFICULTY_OPTIONS = ["쉬움", "보통", "어려움", "불
 export const ADMISSION_FEE_OPTIONS = ["무료", "유료", "정보없음"];
 export const LINK_TYPE_OPTIONS = ["함께가기", "대체장소", "유사분위기"];
 export const COMMENT_TYPE_OPTIONS = ["총평", "특징", "배경", "경치/분위기", "메뉴", "꿀팁", "주의사항", "전문가평가"];
+
+// 숙소 관련 옵션들
+export const ACCOMMODATION_TYPE_OPTIONS = ["호텔", "리조트", "게스트하우스", "펜션", "모텔", "스테이", "기타"];
+export const ACCOMMODATION_PRICE_RANGE_OPTIONS = ["5만원 전후", "10만원 전후", "20만원 이상"];
+export const ACCOMMODATION_VIEW_TYPE_OPTIONS = ["바다뷰", "먼바다뷰", "중산간"];
+export const KID_FRIENDLY_OPTIONS = ["가능", "불가", "연령제한"];
+export const PET_FRIENDLY_OPTIONS = ["가능", "불가", "일부가능"];
+export const BREAKFAST_OPTIONS = ["제공", "미제공", "유료"];
 
 export const REGIONS = [
   {

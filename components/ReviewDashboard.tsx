@@ -10,7 +10,13 @@ import {
   ADMISSION_FEE_OPTIONS,
   LINK_TYPE_OPTIONS,
   COMMENT_TYPE_OPTIONS,
-  ALL_REGIONS
+  ALL_REGIONS,
+  ACCOMMODATION_TYPE_OPTIONS,
+  ACCOMMODATION_PRICE_RANGE_OPTIONS,
+  ACCOMMODATION_VIEW_TYPE_OPTIONS,
+  KID_FRIENDLY_OPTIONS,
+  PET_FRIENDLY_OPTIONS,
+  BREAKFAST_OPTIONS
 } from '../constants';
 import Button from './common/Button';
 import Card from './common/Card';
@@ -526,6 +532,81 @@ const ReviewDashboard: React.FC<ReviewDashboardProps> = ({ initialData, onSave, 
                   />
                   현대 문화
                 </label>
+              </div>
+            </Card>
+          )}
+
+          {/* 숙소 정보 */}
+          {data.categories?.includes('숙소') && (
+            <Card>
+              <h3 className="font-semibold text-lg mb-4">🏨 숙소 정보</h3>
+              <div className="space-y-4">
+                <Select
+                  label="숙소 유형"
+                  value={data.accommodation_info?.accommodation_type || ''}
+                  onChange={e => handleInputChange('accommodation_info', {...(data.accommodation_info || {}), accommodation_type: e.target.value})}
+                  options={ACCOMMODATION_TYPE_OPTIONS}
+                />
+                <Select
+                  label="가격대"
+                  value={data.accommodation_info?.price_range || ''}
+                  onChange={e => handleInputChange('accommodation_info', {...(data.accommodation_info || {}), price_range: e.target.value})}
+                  options={ACCOMMODATION_PRICE_RANGE_OPTIONS}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <Select
+                    label="뷰 유형"
+                    value={data.accommodation_info?.view_type || ''}
+                    onChange={e => handleInputChange('accommodation_info', {...(data.accommodation_info || {}), view_type: e.target.value})}
+                    options={ACCOMMODATION_VIEW_TYPE_OPTIONS}
+                  />
+                  <Select
+                    label="권역"
+                    value={data.accommodation_info?.region || ''}
+                    onChange={e => handleInputChange('accommodation_info', {...(data.accommodation_info || {}), region: e.target.value})}
+                    options={ALL_REGIONS}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Select
+                    label="아이 동반"
+                    value={data.accommodation_info?.kid_friendly || ''}
+                    onChange={e => handleInputChange('accommodation_info', {...(data.accommodation_info || {}), kid_friendly: e.target.value})}
+                    options={KID_FRIENDLY_OPTIONS}
+                  />
+                  <Select
+                    label="반려동물"
+                    value={data.accommodation_info?.pet_friendly || ''}
+                    onChange={e => handleInputChange('accommodation_info', {...(data.accommodation_info || {}), pet_friendly: e.target.value})}
+                    options={PET_FRIENDLY_OPTIONS}
+                  />
+                </div>
+                <Select
+                  label="조식"
+                  value={data.accommodation_info?.breakfast_included || ''}
+                  onChange={e => handleInputChange('accommodation_info', {...(data.accommodation_info || {}), breakfast_included: e.target.value})}
+                  options={BREAKFAST_OPTIONS}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="체크인 시간"
+                    value={data.accommodation_info?.check_in_time || ''}
+                    onChange={e => handleInputChange('accommodation_info', {...(data.accommodation_info || {}), check_in_time: e.target.value})}
+                    placeholder="예: 15:00"
+                  />
+                  <Input
+                    label="체크아웃 시간"
+                    value={data.accommodation_info?.check_out_time || ''}
+                    onChange={e => handleInputChange('accommodation_info', {...(data.accommodation_info || {}), check_out_time: e.target.value})}
+                    placeholder="예: 11:00"
+                  />
+                </div>
+                <Input
+                  label="구글 맵 링크"
+                  value={data.accommodation_info?.google_maps_url || ''}
+                  onChange={e => handleInputChange('accommodation_info', {...(data.accommodation_info || {}), google_maps_url: e.target.value})}
+                  placeholder="https://maps.google.com/..."
+                />
               </div>
             </Card>
           )}

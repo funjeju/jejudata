@@ -7,6 +7,7 @@ import Input from './common/Input';
 import Select from './common/Select';
 import CheckboxGroup from './common/CheckboxGroup';
 import SpotSearchModal from './SpotSearchModal';
+import { ACCOMMODATION_TYPE_OPTIONS, ACCOMMODATION_PRICE_RANGE_OPTIONS } from '../constants';
 
 // The API key is sourced from the environment variable `process.env.API_KEY`.
 const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
@@ -23,6 +24,13 @@ interface TripPlanFormState {
 
   // Step 2: Fixed Points
   accommodationStatus: 'booked' | 'not_booked';
+  wantAccommodationRecommendation: boolean;
+  recommendationPreferences: {
+    priceRange: string;
+    accommodationType: string;
+    region: string;
+    viewType: string;
+  };
   fixedAccommodations: FixedSpot[];
   fixedAttractions: FixedSpot[];
   fixedRestaurants: FixedSpot[];
@@ -52,7 +60,14 @@ const initialFormState: TripPlanFormState = {
   departureMinute: '00',
 
   // Step 2: Fixed Points
-  accommodationStatus: 'not_booked',
+  accommodationStatus: 'booked', // 기본값을 'booked'로 변경 (정해진 숙소 있음)
+  wantAccommodationRecommendation: false,
+  recommendationPreferences: {
+    priceRange: '10만원 전후',
+    accommodationType: '호텔',
+    region: '제주시',
+    viewType: '바다뷰',
+  },
   fixedAccommodations: [],
   fixedAttractions: [],
   fixedRestaurants: [],
@@ -80,6 +95,14 @@ const MINUTE_OPTIONS = ['00', '15', '30', '45'];
 const MUST_TRY_FOODS = ["흑돼지", "갈치조림", "전복죽", "고등어회", "옥돔구이", "성게미역국", "몸국", "빙떡", "호떡", "오메기떡"];
 
 // Step 3 Options - removed, now inline in component
+
+// Step 2 Options
+const ACCOMMODATION_REGIONS = [
+  "성산구좌(제주동쪽)", "표선남원(제주동남쪽)", "서귀포시중문(서귀포시)",
+  "대정안덕(제주남서쪽)", "한림한경(제주서쪽)", "애월(제주시의서쪽)",
+  "제주시", "조천(제주시의동쪽)"
+];
+const ACCOMMODATION_VIEW_TYPES = ["바다뷰", "먼바다뷰", "중산간"];
 
 // Step 4 Options
 const COMPANION_OPTIONS = ["혼자", "친구와", "연인과", "아이를 동반한 가족", "부모님을 모시고", "반려견과 함께", "회사 동료와"];
@@ -289,12 +312,19 @@ const TripPlannerModal: React.FC<TripPlannerModalProps> = ({ isOpen, onClose, sp
 - 총 여행시간: 약 ${totalHours.toFixed(1)}시간
 
 ## 🏨 고정 일정 (최우선 반영)
-- 숙소 상태: ${formState.accommodationStatus === 'booked' ? '예약완료' : '미예약'}
+- 숙소 상태: ${formState.accommodationStatus === 'booked' ? '정해진 숙소 있음' : '정해진 숙소 없음'}
 ${formState.accommodationStatus === 'booked' && formState.fixedAccommodations.length > 0 ?
   `- 예약된 숙소:\n${formState.fixedAccommodations.map(acc =>
     `  * ${acc.name} (${acc.address}) - GPS: ${acc.lat}, ${acc.lng}`).join('\n')}
 - ⚠️ 숙소 체크인 시간: 일반적으로 15:00 (각 숙소 public_info 확인 필요)` :
-  '- ⚠️ 숙소 체크인 시간: 일반적으로 15:00 (숙소 선택 시 확인 필요)'}
+  formState.accommodationStatus === 'not_booked' && formState.wantAccommodationRecommendation ?
+    `- 숙소 추천 요청: ${formState.wantAccommodationRecommendation ? '예' : '아니오'}
+- 선호 가격대: ${formState.recommendationPreferences.priceRange}
+- 선호 숙소 유형: ${formState.recommendationPreferences.accommodationType}
+- 선호 권역: ${formState.recommendationPreferences.region}
+- 선호 뷰 유형: ${formState.recommendationPreferences.viewType}
+- ⚠️ 숙소 체크인 시간: 일반적으로 15:00 (추천 숙소의 accommodation_info.check_in_time 확인)` :
+    '- ⚠️ 숙소 체크인 시간: 일반적으로 15:00 (숙소 선택 시 확인 필요)'}
 ${formState.fixedAttractions.length > 0 ?
   `- 필수 방문 관광지:\n${formState.fixedAttractions.map(att =>
     `  * ${att.name} (${att.address}) - GPS: ${att.lat}, ${att.lng}`).join('\n')}` : '- 필수 방문 관광지: 없음'}
@@ -345,7 +375,25 @@ ${formState.fixedRestaurants.length > 0 ?
    - **역사 & 문화 유적**: interest_tags에 "역사" 포함 또는 cultural_info에서 historical_significance true
    - **짜릿한 액티비티**: interest_tags에 "액티비티" 포함 또는 activity_info에서 activity_level "활동적"/"매우활동적"
    - **걷기 좋은 길**: interest_tags에 "걷기" 포함 또는 activity_info에서 walking_required true
-6. **페이스에 따른 체류시간 조절**:
+6. **숙소 선택 기준 (중요)**:
+   - **숙소 스팟 활용**: categories에 "숙소" 포함된 스팟들만 숙소로 추천
+   - **숙소 추천 요청 처리**:
+     ${formState.accommodationStatus === 'not_booked' && formState.wantAccommodationRecommendation ?
+       `* 사용자가 숙소 추천을 요청했습니다 → 적절한 숙소를 1-2곳 추천해주세요
+     * 가격대 필터링: accommodation_info.price_range = "${formState.recommendationPreferences.priceRange}" 우선
+     * 숙소 유형 필터링: accommodation_info.accommodation_type = "${formState.recommendationPreferences.accommodationType}" 우선
+     * 권역 필터링: accommodation_info.region = "${formState.recommendationPreferences.region}" 우선
+     * 뷰 유형 필터링: accommodation_info.view_type = "${formState.recommendationPreferences.viewType}" 우선` :
+       formState.accommodationStatus === 'booked' ?
+         `* 사용자가 이미 숙소를 정해두었습니다 → 추가 숙소 추천 불필요` :
+         `* 사용자가 숙소 추천을 원하지 않습니다 → 숙소 없이 일정만 작성`}
+   - **가격대 매칭**: 사용자 여행 스타일에 따라 accommodation_info.price_range 고려
+     * "전체 저예산 위주" → "5만원 전후" 우선
+     * "중간 (적당히 절약 + 포인트 투자)" → "5만원 전후", "10만원 전후" 균형
+     * "고급 (숙소·식사·체험 모두 고급 위주)" → "10만원 전후", "20만원 이상" 우선
+   - **동행자 고려**: accommodation_info.kid_friendly, pet_friendly 활용
+   - **체크인 시간**: accommodation_info.check_in_time, check_out_time 정확히 반영
+7. **페이스에 따른 체류시간 조절**:
    - 여유롭게: 기본 시간 + 30%
    - 보통: 기본 시간
    - 촉촘하게: 기본 시간 - 20%, 더 많은 스팟
@@ -472,20 +520,101 @@ ${spotData}
                         onChange={(e) => handleUpdateForm('accommodationStatus', e.target.value as 'booked' | 'not_booked')}
                         className="form-radio"
                       />
-                      <span className="ml-2">예약완료</span>
+                      <span className="ml-2">정해진 숙소 있음</span>
                     </label>
                     <label className="inline-flex items-center">
                       <input
                         type="radio"
                         value="not_booked"
                         checked={formState.accommodationStatus === 'not_booked'}
-                        onChange={(e) => handleUpdateForm('accommodationStatus', e.target.value as 'booked' | 'not_booked')}
+                        onChange={(e) => {
+                          handleUpdateForm('accommodationStatus', e.target.value as 'booked' | 'not_booked');
+                          handleUpdateForm('wantAccommodationRecommendation', false);
+                        }}
                         className="form-radio"
                       />
-                      <span className="ml-2">미예약</span>
+                      <span className="ml-2">정해진 숙소 없음</span>
                     </label>
                   </div>
                 </div>
+
+                {formState.accommodationStatus === 'not_booked' && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">숙소 추천해 드릴까요?</label>
+                      <div className="space-x-4">
+                        <label className="inline-flex items-center">
+                          <input
+                            type="radio"
+                            value="yes"
+                            checked={formState.wantAccommodationRecommendation === true}
+                            onChange={() => handleUpdateForm('wantAccommodationRecommendation', true)}
+                            className="form-radio"
+                          />
+                          <span className="ml-2">네, 추천해 주세요</span>
+                        </label>
+                        <label className="inline-flex items-center">
+                          <input
+                            type="radio"
+                            value="no"
+                            checked={formState.wantAccommodationRecommendation === false}
+                            onChange={() => handleUpdateForm('wantAccommodationRecommendation', false)}
+                            className="form-radio"
+                          />
+                          <span className="ml-2">아니요, 괜찮습니다</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {formState.wantAccommodationRecommendation && (
+                      <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                        <h4 className="font-medium text-gray-800">숙소 추천 설정</h4>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <Select
+                            label="가격대 (1박 기준)"
+                            value={formState.recommendationPreferences.priceRange}
+                            onChange={(e) => handleUpdateForm('recommendationPreferences', {
+                              ...formState.recommendationPreferences,
+                              priceRange: e.target.value
+                            })}
+                            options={ACCOMMODATION_PRICE_RANGE_OPTIONS}
+                          />
+                          <Select
+                            label="숙소 유형"
+                            value={formState.recommendationPreferences.accommodationType}
+                            onChange={(e) => handleUpdateForm('recommendationPreferences', {
+                              ...formState.recommendationPreferences,
+                              accommodationType: e.target.value
+                            })}
+                            options={ACCOMMODATION_TYPE_OPTIONS}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <Select
+                            label="선호 권역"
+                            value={formState.recommendationPreferences.region}
+                            onChange={(e) => handleUpdateForm('recommendationPreferences', {
+                              ...formState.recommendationPreferences,
+                              region: e.target.value
+                            })}
+                            options={ACCOMMODATION_REGIONS}
+                          />
+                          <Select
+                            label="뷰 유형"
+                            value={formState.recommendationPreferences.viewType}
+                            onChange={(e) => handleUpdateForm('recommendationPreferences', {
+                              ...formState.recommendationPreferences,
+                              viewType: e.target.value
+                            })}
+                            options={ACCOMMODATION_VIEW_TYPES}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {formState.accommodationStatus === 'booked' && (
                   <div>

@@ -33,6 +33,20 @@ export interface CategorySpecificInfo {
   difficulty?: string;
 }
 
+// 숙소 전용 정보
+export interface AccommodationInfo {
+  accommodation_type: "호텔" | "리조트" | "게스트하우스" | "펜션" | "모텔" | "스테이" | "기타";
+  price_range: "5만원 전후" | "10만원 전후" | "20만원 이상";
+  view_type: "바다뷰" | "먼바다뷰" | "중산간";
+  region: string; // 권역 정보
+  kid_friendly: "가능" | "불가" | "연령제한";
+  pet_friendly: "가능" | "불가" | "일부가능";
+  breakfast_included: "제공" | "미제공" | "유료";
+  check_in_time: string; // 예: "15:00"
+  check_out_time: string; // 예: "11:00"
+  google_maps_url?: string; // 구글 맵 링크
+}
+
 // 관심사 매핑을 위한 새로운 인터페이스들
 export interface ViewInfo {
   ocean_view: boolean;
@@ -136,6 +150,9 @@ export interface Place {
   cultural_info?: CulturalInfo | null;
   activity_info?: ActivityInfo | null;
   trend_info?: TrendInfo | null;
+
+  // 숙소 전용 정보
+  accommodation_info?: AccommodationInfo | null;
 
   // For collaboration and versioning
   suggestions?: Record<string, Suggestion[]>;

@@ -139,6 +139,23 @@ const draftGenerationSchema = {
             description: "트렌드/인기도 정보",
             nullable: true,
         },
+        accommodation_info: {
+            type: Type.OBJECT,
+            properties: {
+                accommodation_type: { type: Type.STRING, enum: ["호텔", "리조트", "게스트하우스", "펜션", "모텔", "스테이", "기타"], description: "숙소 유형" },
+                price_range: { type: Type.STRING, enum: ["5만원 전후", "10만원 전후", "20만원 이상"], description: "1박 가격대" },
+                view_type: { type: Type.STRING, enum: ["바다뷰", "먼바다뷰", "중산간"], description: "뷰 유형" },
+                region: { type: Type.STRING, description: "권역 정보 (주소를 기반으로 자동 매칭)" },
+                kid_friendly: { type: Type.STRING, enum: ["가능", "불가", "연령제한"], description: "아이 동반 가능 여부" },
+                pet_friendly: { type: Type.STRING, enum: ["가능", "불가", "일부가능"], description: "반려동물 동반 가능 여부" },
+                breakfast_included: { type: Type.STRING, enum: ["제공", "미제공", "유료"], description: "조식 제공 여부" },
+                check_in_time: { type: Type.STRING, description: "체크인 시간 (예: 15:00)" },
+                check_out_time: { type: Type.STRING, description: "체크아웃 시간 (예: 11:00)" },
+                google_maps_url: { type: Type.STRING, description: "구글 맵 링크", nullable: true },
+            },
+            description: "숙소 전용 정보 (카테고리가 '숙소'인 경우에만 필수)",
+            nullable: true,
+        },
     },
     required: ["place_name", "attributes", "expert_tip_final", "interest_tags"]
 };
@@ -298,6 +315,22 @@ You are an AI data assistant for Jeju DB, a Jeju travel platform. Your goal is t
     *   **trend_info**: SNS 언급, 최신 트렌드, 인기도를 종합적으로 분석
     *   **shopping_info**: 쇼핑 가능 항목을 구체적으로 분류
     *   **cultural_info**: 역사적/문화적 요소를 세분화하여 분석
+    *   **accommodation_info**: 숙소인 경우 필수 정보 분류:
+        - accommodation_type: 건물 유형과 규모에 따라 분류 (호텔/리조트/게스트하우스/펜션/모텔/스테이)
+        - price_range: 검색 결과나 설명에서 1박 가격대 추정 (5만원 전후/10만원 전후/20만원 이상)
+        - view_type: 뷰 특성에 따라 분류 (바다뷰/먼바다뷰/중산간)
+        - region: 주소 기반 권역 자동 매칭
+          * 성산읍, 구좌읍, 우도면 → "성산구좌(제주동쪽)"
+          * 표선면, 남원읍 → "표선남원(제주동남쪽)"
+          * 서귀포시, 중문 → "서귀포시중문(서귀포시)"
+          * 대정읍, 안덕면 → "대정안덕(제주남서쪽)"
+          * 한림읍, 한경면 → "한림한경(제주서쪽)"
+          * 애월읍 → "애월(제주시의서쪽)"
+          * 제주시 동(洞) 지역 → "제주시"
+          * 조천읍 → "조천(제주시의동쪽)"
+        - 체크인/아웃 시간: 일반적으로 15:00/11:00이지만 실제 정보가 있으면 정확히 기재
+        - 아이/반려동물 동반 가능성: 설명에서 언급되지 않으면 '가능'으로 기본 설정
+        - 조식: 언급되지 않으면 '미제공'으로 기본 설정
 
 6.  **Quality Guidelines**:
     - Ensure expert insights are preserved and highlighted
