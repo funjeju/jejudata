@@ -541,3 +541,127 @@ JSON 형태로만 반환하세요. 추가 설명이나 마크다운 없이 순�
         throw new Error("AI 오름 분석에 실패했습니다. 콘솔을 확인해주세요.");
     }
 };
+
+/**
+ * Phase 1: AI 기반 후보 스팟 필터링 및 점수 매기기
+ * 사용자의 여행 조건에 맞는 스팟들을 DB에서 필터링하고 관련성 점수를 부여
+ */
+interface ItineraryFilterRequest {
+    interests: string[]; // 관심사 태그들
+    companions: string[]; // 동행자
+    pace: 'slow' | 'moderate' | 'fast'; // 여행 페이스
+    budget: 'low' | 'medium' | 'high'; // 예산
+    preferRainyDay?: boolean; // 비오는날 추천 여부
+    preferHiddenGems?: boolean; // 히든플레이스 선호
+    avoidCrowds?: boolean; // 혼잡한 곳 회피
+    fixedSpotNames?: string[]; // 필수 방문지 이름들
+}
+
+interface SpotScore {
+    place_id: string;
+    place_name: string;
+    relevanceScore: number; // 0-100
+    reasoning: string; // 점수 이유
+}
+
+const spotScoringSchema = {
+    type: Type.OBJECT,
+    properties: {
+        scores: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    place_id: { type: Type.STRING },
+                    place_name: { type: Type.STRING },
+                    relevanceScore: { type: Type.NUMBER, description: "0-100 점수, 사용자 조건에 얼마나 잘 맞는지" },
+                    reasoning: { type: Type.STRING, description: "점수를 부여한 이유 (간단히)" }
+                },
+                required: ["place_id", "place_name", "relevanceScore", "reasoning"]
+            }
+        }
+    },
+    required: ["scores"]
+};
+
+export const scoreCandidateSpots = async (
+    candidateSpots: Array<{ place_id: string; place_name: string; interest_tags?: string[]; trend_info?: any; attributes?: any; category_specific_info?: any }>,
+    filterRequest: ItineraryFilterRequest
+): Promise<SpotScore[]> => {
+
+    // 스팟 정보 요약 생성
+    const spotsInfo = candidateSpots.map(spot => ({
+        place_id: spot.place_id,
+        place_name: spot.place_name,
+        interest_tags: spot.interest_tags || [],
+        trend: spot.trend_info?.trend_status || '정보없음',
+        popularity: spot.trend_info?.popularity_level || '정보없음',
+        targetAudience: spot.attributes?.targetAudience || [],
+        priceRange: spot.category_specific_info?.priceRange || '정보없음'
+    }));
+
+    const prompt = `
+# ROLE & GOAL
+당신은 제주도 여행 일정 AI 전문가입니다. 사용자의 여행 조건에 맞춰 후보 스팟들에 관련성 점수를 부여해주세요.
+
+# 사용자 여행 조건
+- **관심사**: ${filterRequest.interests.join(', ')}
+- **동행자**: ${filterRequest.companions.join(', ')}
+- **여행 페이스**: ${filterRequest.pace === 'slow' ? '느긋한 여행' : filterRequest.pace === 'moderate' ? '적당한 페이스' : '빡빡한 일정'}
+- **예산**: ${filterRequest.budget === 'low' ? '가성비 중심' : filterRequest.budget === 'medium' ? '중간 예산' : '고급 여행'}
+- **비오는날 추천**: ${filterRequest.preferRainyDay ? '예' : '아니오'}
+- **히든플레이스 선호**: ${filterRequest.preferHiddenGems ? '예' : '아니오'}
+- **혼잡한 곳 회피**: ${filterRequest.avoidCrowds ? '예' : '아니오'}
+- **필수 방문지**: ${filterRequest.fixedSpotNames?.join(', ') || '없음'}
+
+# 후보 스팟 목록
+${JSON.stringify(spotsInfo, null, 2)}
+
+# INSTRUCTIONS
+각 스팟에 대해 0-100점의 관련성 점수를 부여하세요.
+
+## 점수 부여 기준
+1. **관심사 일치** (40점): interest_tags가 사용자 관심사와 얼마나 일치하는가
+2. **동행자 적합성** (20점): targetAudience가 동행자 유형과 맞는가 (가족->아이 동반, 연인->커플 등)
+3. **여행 페이스 적합성** (15점):
+   - slow: 휴식중심, 한적함 선호
+   - moderate: 균형잡힌 활동
+   - fast: 많은 장소 방문, 효율성 중시
+4. **예산 적합성** (10점): priceRange가 예산과 맞는가
+5. **특별 선호사항** (15점):
+   - 비오는날: rainy_day_friendly 체크
+   - 히든플레이스: trend_status가 '숨은명소'인지
+   - 혼잡 회피: popularity_level이 '한적함' 또는 '보통'인지
+
+## 특별 규칙
+- **필수 방문지**로 지정된 스팟은 무조건 90-100점 부여
+- 관심사가 전혀 맞지 않으면 30점 미만
+- 여러 관심사와 일치하면 가산점
+
+# OUTPUT
+JSON 형식으로 각 스팟의 점수와 이유를 반환하세요.
+`;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: spotScoringSchema,
+            },
+        });
+
+        const jsonText = response.text.trim();
+        if (!jsonText) {
+            throw new Error("AI에서 점수 응답을 받지 못했습니다.");
+        }
+
+        const result = JSON.parse(jsonText);
+        return result.scores as SpotScore[];
+
+    } catch (error) {
+        console.error("스팟 점수 매기기 오류:", error);
+        throw new Error("AI 스팟 점수 매기기에 실패했습니다.");
+    }
+};

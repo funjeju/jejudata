@@ -251,3 +251,128 @@ export interface FixedSpot {
   placeId: string;
   type: 'accommodation' | 'restaurant' | 'attraction';
 }
+
+// 여행일정 생성 관련 타입들
+export interface ItineraryRequest {
+  // 기본 정보
+  startDate: string; // ISO 날짜
+  endDate: string; // ISO 날짜
+  dailyTravelHours: number; // 하루 여행 시간 (예: 8시간)
+
+  // 시작점과 목적지
+  startPoint: SpotLocation; // 첫날 시작점 (제주공항 등)
+  endPoint: SpotLocation; // 마지막날 도착점 (제주공항 등)
+  accommodations?: AccommodationByDate[]; // 날짜별 숙소 정보
+
+  // 사용자 선호 정보
+  interests: string[]; // 관심사 태그들
+  companions: string[]; // 동행자 (가족, 연인, 친구 등)
+  pace: 'slow' | 'moderate' | 'fast'; // 여행 페이스
+  budget: 'low' | 'medium' | 'high'; // 예산
+
+  // 고정 방문지
+  fixedSpots?: FixedSpot[]; // 필수 방문지
+
+  // 추가 옵션
+  preferRainyDay?: boolean; // 비오는날 추천 여부
+  preferHiddenGems?: boolean; // 히든플레이스 선호
+  avoidCrowds?: boolean; // 혼잡한 곳 회피
+}
+
+export interface SpotLocation {
+  name: string;
+  latitude: number;
+  longitude: number;
+  address?: string;
+  placeId?: string;
+}
+
+export interface AccommodationByDate {
+  date: string; // ISO 날짜
+  location: SpotLocation;
+}
+
+// 이동 코리도 (Phase 0)
+export interface TravelCorridor {
+  startPoint: SpotLocation;
+  endPoint: SpotLocation;
+  radiusKm: number; // 코리도 반경 (km)
+  centerLine: {
+    lat1: number;
+    lng1: number;
+    lat2: number;
+    lng2: number;
+  };
+}
+
+// 후보 스팟 (Phase 1)
+export interface CandidateSpot {
+  place: Place; // DB의 Place 정보
+  relevanceScore: number; // AI가 계산한 관련성 점수 (0-100)
+  distanceFromCorridor: number; // 코리도 중심선으로부터 거리 (km)
+  inCorridor: boolean; // 코리도 내부 여부
+}
+
+// 다음 스팟 결정을 위한 평가 결과 (Phase 2)
+export interface SpotEvaluation {
+  candidate: CandidateSpot;
+  travelTimeMinutes: number; // 현재 위치에서 이동 시간
+  directionScore: number; // 방향성 점수 (0-100)
+  preferenceScore: number; // 선호도 점수 (0-100)
+  isOpenNow: boolean; // 현재 시간 영업 여부
+  isMandatory: boolean; // 필수 방문지 여부
+  totalScore: number; // 최종 종합 점수
+}
+
+// 하루 일정의 방문지
+export interface ItinerarySpot {
+  spot: Place;
+  arrivalTime: string; // HH:mm 형식
+  departureTime: string; // HH:mm 형식
+  durationMinutes: number; // 체류 시간
+  travelTimeToNext?: number; // 다음 장소까지 이동 시간
+  notes?: string; // 추가 메모
+}
+
+// 하루 일정
+export interface DayPlan {
+  date: string; // ISO 날짜
+  dayNumber: number; // 여행 N일차
+  startLocation: SpotLocation; // 시작점 (전날 숙소 or 공항)
+  endLocation: SpotLocation; // 종료점 (당일 숙소 or 공항)
+  spots: ItinerarySpot[]; // 방문 장소들
+  totalTravelTimeMinutes: number; // 총 이동 시간
+  totalActivityTimeMinutes: number; // 총 활동 시간
+  corridor: TravelCorridor; // 당일 이동 코리도
+}
+
+// 최종 경로 정보 (Phase 3 - Directions API)
+export interface RouteSegment {
+  origin: SpotLocation;
+  destination: SpotLocation;
+  durationMinutes: number;
+  distanceKm: number;
+  steps: RouteStep[]; // 상세 길 안내
+  polyline?: string; // 지도 표시용 폴리라인
+}
+
+export interface RouteStep {
+  instruction: string; // "해안 도로를 따라 직진"
+  distanceMeters: number;
+  durationSeconds: number;
+}
+
+// 전체 여행 일정
+export interface TravelItinerary {
+  request: ItineraryRequest; // 원래 요청
+  plans: DayPlan[]; // 날짜별 일정
+  routes: RouteSegment[]; // 전체 경로 세그먼트들
+  summary: {
+    totalDays: number;
+    totalSpots: number;
+    totalTravelTimeMinutes: number;
+    coverageRegions: string[]; // 방문하는 권역들
+  };
+  generatedAt: Date;
+  aiStory?: string; // AI가 생성한 여행 스토리
+}
