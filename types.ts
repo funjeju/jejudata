@@ -33,6 +33,8 @@ export interface Attributes {
   parkingDifficulty: string;
   admissionFee: string;
   recommended_time_of_day?: string[];
+  rainy_day_friendly?: boolean;
+  is_hidden_gem?: boolean;
 }
 
 export interface CategorySpecificInfo {
@@ -108,6 +110,7 @@ export interface PublicInfo {
     phone_number?: string;
     website_url?: string;
     closed_days?: string[];
+    is_old_shop?: boolean;
 }
 
 export interface Suggestion {

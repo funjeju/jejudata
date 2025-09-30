@@ -51,6 +51,8 @@ const draftGenerationSchema = {
                 parkingDifficulty: { type: Type.STRING },
                 admissionFee: { type: Type.STRING },
                 recommended_time_of_day: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Best time of day to visit, e.g., '오전', '일몰', '점심시간 피하기'", nullable: true },
+                rainy_day_friendly: { type: Type.BOOLEAN, description: "비오는 날에도 방문하기 좋은지 (실내 활동, 우천 시 더 멋진 경관 등)", nullable: true },
+                is_hidden_gem: { type: Type.BOOLEAN, description: "숨은 명소인지 (관광객이 적고, 현지인만 아는 곳)", nullable: true },
             },
             description: "Core attributes of the spot, inferred from the description."
         },
@@ -237,6 +239,38 @@ const simulateWebSearch = async (spotName: string, categories: string[]): Promis
 • 커플 여행객들에게 인기
 • 사전 예약 필수 (성수기)
 • 주변 관광지 접근성 우수`;
+
+    } else if (categories.includes('포토존')) {
+        searchInfo += `📸 포토존 정보:
+• 최적 촬영시간: 골든아워 (일출/일몰 1시간 전후)
+• 인기 포인트: 인스타그램 태그 #제주포토존으로 유명
+• 주차: 근처 무료 주차 가능
+
+📱 SNS 후기:
+• "사진이 진짜 예쁘게 나와요"
+• "배경이 완전 인생샷 명소"
+• "웨딩촬영 장소로도 인기"
+
+💡 촬영 팁:
+• 오전 9-11시, 오후 4-6시 빛이 가장 좋음
+• 주말/공휴일에는 사람이 많으니 평일 추천
+• 소품 가져가면 더 다양한 컨셉 가능`;
+
+    } else if (categories.includes('히든플레이스')) {
+        searchInfo += `🗝️ 히든플레이스 정보:
+• 접근성: 현지인들만 아는 숨은 명소
+• 특징: 관광객이 적어 조용하고 한적함
+• 발견 경로: 제주 로컬 블로거 추천
+
+🌟 방문자 후기:
+• "정말 숨겨진 보석 같은 곳"
+• "사람이 없어서 온전히 즐길 수 있음"
+• "제주의 진짜 매력을 느낄 수 있는 곳"
+
+⚠️ 주의사항:
+• GPS 좌표 정확히 확인 후 방문
+• 현지 주민 배려하며 조용히 방문
+• 일부 시간대에만 접근 가능할 수 있음`;
     } else {
         searchInfo += `📝 일반 정보:
 • 위치: 제주도 내 접근성 양호

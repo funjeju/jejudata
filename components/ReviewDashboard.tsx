@@ -252,6 +252,17 @@ const ReviewDashboard: React.FC<ReviewDashboardProps> = ({ initialData, onSave, 
                <Input label="정기 휴무일 (쉼표로 구분)" value={data.public_info?.closed_days?.join(', ') || ''} onChange={e => handlePublicInfoChange('closed_days', e.target.value.split(',').map(t => t.trim()).filter(Boolean))} placeholder="예: 월요일, 화요일" />
                <Input label="연락처" value={data.public_info?.phone_number || ''} onChange={e => handlePublicInfoChange('phone_number', e.target.value)} placeholder="예: 064-123-4567"/>
                <Input label="웹사이트 URL" value={data.public_info?.website_url || ''} onChange={e => handlePublicInfoChange('website_url', e.target.value)} placeholder="예: https://instagram.com/jeju_spot"/>
+               {data.categories?.includes('식당') && (
+                 <label className="flex items-center col-span-1 md:col-span-2">
+                   <input
+                     type="checkbox"
+                     checked={data.public_info?.is_old_shop || false}
+                     onChange={e => handlePublicInfoChange('is_old_shop', e.target.checked)}
+                     className="form-checkbox mr-2"
+                   />
+                   노포 (오래된 맛집)
+                 </label>
+               )}
             </div>
           </Card>
           
@@ -265,6 +276,26 @@ const ReviewDashboard: React.FC<ReviewDashboardProps> = ({ initialData, onSave, 
                 <Select label="입장료" value={data.attributes.admissionFee} onChange={e => handleAttributeChange('admissionFee', e.target.value)} options={ADMISSION_FEE_OPTIONS} />
                  <div className="col-span-2 md:col-span-3">
                    <Input label="추천 시간대 (쉼표로 구분)" value={timeOfDayInput} onChange={e => setTimeOfDayInput(e.target.value)} onBlur={e => handleAttributeChange('recommended_time_of_day', e.target.value.split(',').map(t => t.trim()).filter(Boolean))} placeholder="예: 오전, 일몰, 점심시간 피하기" />
+                 </div>
+                 <div className="col-span-2 md:col-span-3 flex gap-6">
+                   <label className="flex items-center">
+                     <input
+                       type="checkbox"
+                       checked={data.attributes.rainy_day_friendly || false}
+                       onChange={e => handleAttributeChange('rainy_day_friendly', e.target.checked)}
+                       className="form-checkbox mr-2"
+                     />
+                     비오는날 추천
+                   </label>
+                   <label className="flex items-center">
+                     <input
+                       type="checkbox"
+                       checked={data.attributes.is_hidden_gem || false}
+                       onChange={e => handleAttributeChange('is_hidden_gem', e.target.checked)}
+                       className="form-checkbox mr-2"
+                     />
+                     히든플레이스 (숨은 명소)
+                   </label>
                  </div>
               </div>
               <div className="mt-6">

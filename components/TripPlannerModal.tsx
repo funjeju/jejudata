@@ -369,14 +369,23 @@ ${formState.fixedRestaurants.length > 0 ?
    ).join('\n   ')}
 
    **각 관심사별 스팟 매칭 기준**:
-   - **자연**: interest_tags에 "자연" 포함 또는 view_info에서 nature_view/mountain_view true
-   - **오션뷰**: interest_tags에 "오션뷰" 포함 또는 view_info에서 ocean_view true
+   - **자연**: interest_tags에 "자연" 포함 또는 view_info에서 nature_view/mountain_view true 또는 categories에 "포토존" 포함 (자연 포토스팟)
+   - **오션뷰**: interest_tags에 "오션뷰" 포함 또는 view_info에서 ocean_view true 또는 categories에 "포토존" 포함 (바다 포토스팟)
    - **요즘 뜨는 핫플**: interest_tags에 "요즘핫플" 포함 또는 trend_info에서 trend_status "요즘핫플"
    - **쇼핑 & 소품샵**: interest_tags에 "쇼핑" 포함 또는 shopping_info 데이터 존재
    - **박물관 & 미술관**: interest_tags에 "박물관" 포함 또는 categories에 박물관/미술관 포함
    - **역사 & 문화 유적**: interest_tags에 "역사" 포함 또는 cultural_info에서 historical_significance true
    - **짜릿한 액티비티**: interest_tags에 "액티비티" 포함 또는 activity_info에서 activity_level "활동적"/"매우활동적"
    - **걷기 좋은 길**: interest_tags에 "걷기" 포함 또는 activity_info에서 walking_required true
+   - **히든플레이스 (숨은 명소)**: categories에 "히든플레이스" 포함 또는 interest_tags에 "히든" 포함 또는 attributes.is_hidden_gem true
+
+   **⚠️ 특수 속성 고려**:
+   - **비오는 날 추천 스팟**: attributes.rainy_day_friendly true인 스팟 (실내 활동, 박물관, 카페, 우천 시 더 멋진 폭포/경관 등)
+     * 비가 오는 경우 우선 선택
+     * 실외 활동이 어려운 날씨일 때 대체 일정으로 유용
+   - **히든플레이스**: attributes.is_hidden_gem true인 스팟 (관광객 적고, 현지인만 아는 곳)
+     * 사용자가 히든플레이스 관심사를 선택한 경우 우선 선택
+     * 조용하고 한적한 분위기를 원하는 여행자에게 추천
 6. **숙소 선택 기준 (중요)**:
    - **숙소 스팟 활용**: categories에 "숙소" 포함된 스팟들만 숙소로 추천
    - **숙소 추천 요청 처리**:
@@ -395,10 +404,21 @@ ${formState.fixedRestaurants.length > 0 ?
      * "고급 (숙소·식사·체험 모두 고급 위주)" → "10만원 전후", "20만원 이상" 우선
    - **동행자 고려**: accommodation_info.kid_friendly, pet_friendly 활용
    - **체크인 시간**: accommodation_info.check_in_time, check_out_time 정확히 반영
-7. **페이스에 따른 체류시간 조절**:
-   - 여유롭게: 기본 시간 + 30%
-   - 보통: 기본 시간
-   - 촉촘하게: 기본 시간 - 20%, 더 많은 스팟
+7. **페이스에 따른 일정 조절**:
+   - **여유롭게**:
+     * 아침 일정 시작 시간: 10:00
+     * 각 스팟 체류시간: 기본 시간 + 20%
+     * 저녁식사 시간대: 18:30 ~ 20:00 사이에 배치
+     * 이동시간은 기본 이동시간 적용 (추가 증가 없음)
+   - **보통**:
+     * 아침 일정 시작 시간: 09:30
+     * 각 스팟 체류시간: 기본 시간 그대로
+     * 저녁식사 시간대: 19:00 전후에 배치
+   - **촘촘하게**:
+     * 아침 일정 시작 시간: 09:00
+     * 각 스팟 체류시간: 기본 시간 - 20%
+     * 하루 일정에 스팟 2-3개 더 추가될 수 있도록 구성
+     * 저녁식사 시간대: 19:00 ~ 20:00 사이에 배치
 
 ## 📍 이용 가능한 데이터
 
