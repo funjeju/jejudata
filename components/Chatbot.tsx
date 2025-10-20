@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
-import type { Place, UserLocation, OroomData } from '../types';
+import type { Place, UserLocation, OroomData, NewsItem } from '../types';
 import Button from './common/Button';
 import LocationPermissionModal from './LocationPermissionModal';
 import { getCurrentLocation, getLocationErrorMessage, formatLocationForDisplay } from '../utils/locationUtils';
@@ -13,6 +13,7 @@ interface ChatbotProps {
   onClose: () => void;
   spots: Place[];
   orooms: OroomData[];
+  news: NewsItem[];
   onNavigateToSpot: (placeId: string) => void;
 }
 
@@ -29,7 +30,7 @@ interface Message {
 }
 
 
-const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, orooms, onNavigateToSpot }) => {
+const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, orooms, news, onNavigateToSpot }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -196,6 +197,25 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, orooms, onNav
         ## VOLCANIC CONES (오름 정보)
         \`\`\`json
         ${JSON.stringify(relevantOrooms, null, 2)}
+        \`\`\`
+
+        ## LATEST NEWS & UPDATES (최신 소식)
+        **IMPORTANT**: Always check this section for current information about spots, seasonal updates, events, or closures.
+        When recommending a spot, mention any related news if available.
+        \`\`\`json
+        ${JSON.stringify(news.map(n => ({
+          id: n.id,
+          type: n.type,
+          title: n.title,
+          content: n.content,
+          badge: n.badge,
+          related_spot_ids: n.related_spot_ids,
+          keywords: n.keywords,
+          season: n.season,
+          month: n.month,
+          region: n.region,
+          published_at: new Date(n.published_at.seconds * 1000).toLocaleDateString('ko-KR')
+        })), null, 2)}
         \`\`\`
         ${locationContext}
         # USER'S QUESTION

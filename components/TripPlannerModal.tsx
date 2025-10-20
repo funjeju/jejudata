@@ -24,13 +24,7 @@ interface TripPlanFormState {
 
   // Step 2: Fixed Points
   accommodationStatus: 'booked' | 'not_booked';
-  wantAccommodationRecommendation: boolean;
-  recommendationPreferences: {
-    priceRange: string;
-    accommodationType: string;
-    region: string;
-    viewType: string;
-  };
+  accommodationRegions: string[]; // 숙소 미지정 시 박수만큼 지역 선택
   fixedAccommodations: FixedSpot[];
   fixedAttractions: FixedSpot[];
   fixedRestaurants: FixedSpot[];
@@ -60,14 +54,8 @@ const initialFormState: TripPlanFormState = {
   departureMinute: '00',
 
   // Step 2: Fixed Points
-  accommodationStatus: 'booked', // 기본값을 'booked'로 변경 (정해진 숙소 있음)
-  wantAccommodationRecommendation: false,
-  recommendationPreferences: {
-    priceRange: '10만원 전후',
-    accommodationType: '호텔',
-    region: '제주시',
-    viewType: '바다뷰',
-  },
+  accommodationStatus: 'not_booked', // 기본값: 숙소 미지정
+  accommodationRegions: [], // 박수만큼 지역 선택 (빈 배열로 시작)
   fixedAccommodations: [],
   fixedAttractions: [],
   fixedRestaurants: [],
@@ -308,10 +296,11 @@ const TripPlannerModal: React.FC<TripPlannerModalProps> = ({ isOpen, onClose, sp
 다음 정보를 바탕으로 제주도 여행 일정을 작성해주세요:
 
 ## 🕐 여행 기간 정보
-- ${formState.nights}박 ${formState.days}일
-- 도착시간: ${formState.arrivalHour}:${formState.arrivalMinute}
-- 출발시간: ${formState.departureHour}:${formState.departureMinute}
+- ${formState.nights}박 ${formState.days}일 (총 ${formState.days}일간의 일정)
+- 1일차 시작: 제주공항 도착 ${formState.arrivalHour}:${formState.arrivalMinute}
+- ${formState.days}일차 종료: 제주공항 출발 ${formState.departureHour}:${formState.departureMinute}
 - 총 여행시간: 약 ${totalHours.toFixed(1)}시간
+- ⚠️ 일정은 반드시 "1일차", "2일차", "3일차" 형식으로 ${formState.days}개의 일차만 작성하세요 (Day 1, Day 2 등의 표현 사용 금지)
 
 ## 🏨 고정 일정 (최우선 반영)
 - 숙소 상태: ${formState.accommodationStatus === 'booked' ? '정해진 숙소 있음' : '정해진 숙소 없음'}
@@ -319,14 +308,14 @@ ${formState.accommodationStatus === 'booked' && formState.fixedAccommodations.le
   `- 예약된 숙소:\n${formState.fixedAccommodations.map(acc =>
     `  * ${acc.name} (${acc.address}) - GPS: ${acc.lat}, ${acc.lng}`).join('\n')}
 - ⚠️ 숙소 체크인 시간: 일반적으로 15:00 (각 숙소 public_info 확인 필요)` :
-  formState.accommodationStatus === 'not_booked' && formState.wantAccommodationRecommendation ?
-    `- 숙소 추천 요청: ${formState.wantAccommodationRecommendation ? '예' : '아니오'}
-- 선호 가격대: ${formState.recommendationPreferences.priceRange}
-- 선호 숙소 유형: ${formState.recommendationPreferences.accommodationType}
-- 선호 권역: ${formState.recommendationPreferences.region}
-- 선호 뷰 유형: ${formState.recommendationPreferences.viewType}
-- ⚠️ 숙소 체크인 시간: 일반적으로 15:00 (추천 숙소의 accommodation_info.check_in_time 확인)` :
-    '- ⚠️ 숙소 체크인 시간: 일반적으로 15:00 (숙소 선택 시 확인 필요)'}
+  formState.accommodationStatus === 'not_booked' && formState.accommodationRegions.length > 0 ?
+    `- 숙소 지역 지정: ${formState.accommodationRegions.map((region, idx) => `${idx + 1}일차 - ${region}`).join(', ')}
+- ⚠️ AI가 각 일차마다 지정된 지역의 숙소를 임의로 선택하여 동선을 구성하세요
+- ⚠️ 각 일차의 동선은 지정된 지역을 중심으로 효율적으로 짜주세요
+${formState.fixedAttractions.length > 0 || formState.fixedRestaurants.length > 0 ?
+  `- ⚠️ 필수 방문지가 있을 경우, 해당 장소와 가장 가까운 지정 지역의 날짜에 배치하세요` : ''}
+- ⚠️ 숙소 체크인 시간: 일반적으로 15:00, 체크아웃: 11:00` :
+    '- ⚠️ 숙소가 지정되지 않았습니다. 동선을 짤 수 없습니다.'}
 ${formState.fixedAttractions.length > 0 ?
   `- 필수 방문 관광지:\n${formState.fixedAttractions.map(att =>
     `  * ${att.name} (${att.address}) - GPS: ${att.lat}, ${att.lng}`).join('\n')}` : '- 필수 방문 관광지: 없음'}
@@ -348,13 +337,16 @@ ${formState.fixedRestaurants.length > 0 ?
 
 ## 📋 일정 작성 규칙
 1. **숙소를 중심으로 한 효율적 동선 설계**
-2. **숙소 체크인 시간 고려 (매우 중요)**:
-   - 숙소 체크인은 일반적으로 15:00 이후 가능 (각 숙소 public_info에서 확인)
-   - ⚠️ 동선 효율성을 우선하고, 체크인은 자연스럽게 배치:
-     * 숙소가 관광 경로 중간에 위치 → 15:00 이후 편리한 시점에 체크인
-     * 숙소가 관광 경로 끝에 위치 → 저녁식사 후 마지막에 체크인
-   - 첫날: 도착 후 숙소 방향으로 이동하며 효율적인 동선 구성 (렌터카 짐 보관)
-   - 마지막날: 체크아웃 시간(일반적으로 11:00) 고려하여 출발 전 마무리
+2. **숙소 체크인/체크아웃 표기 방식 (매우 중요)**:
+   - ⚠️ 체크인은 별도 시간 슬롯으로 잡지 마세요
+   - **체크인 표기**: 저녁 식사 후 "숙소 체크인 및 휴식"으로 통합
+     * 예: "19:30: 숙소 체크인 및 휴식 (체크인 15:00 이후 가능)"
+     * 체크인 가능 시간은 괄호 안에 참고 정보로만 표시
+   - **체크아웃 표기**: 다음날 아침 첫 일정 전에 표기
+     * 예: "09:30: 숙소 체크아웃 (체크아웃 11:00까지)"
+     * 체크아웃 마감 시간은 괄호 안에 참고 정보로만 표시
+   - 첫날: 저녁 식사 후 자연스럽게 숙소로 체크인
+   - 마지막날: 체크아웃 시간을 고려하여 오전 일정 배치
 3. **점심 후 ${formState.postLunchCafe ? '반드시' : '가능하면'} 카페 포함**
 4. **저녁식사 배치 규칙**:
    ${formState.nextDayConsideration === 'same_day_finish'
@@ -387,23 +379,28 @@ ${formState.fixedRestaurants.length > 0 ?
      * 사용자가 히든플레이스 관심사를 선택한 경우 우선 선택
      * 조용하고 한적한 분위기를 원하는 여행자에게 추천
 6. **숙소 선택 기준 (중요)**:
-   - **숙소 스팟 활용**: categories에 "숙소" 포함된 스팟들만 숙소로 추천
-   - **숙소 추천 요청 처리**:
-     ${formState.accommodationStatus === 'not_booked' && formState.wantAccommodationRecommendation ?
-       `* 사용자가 숙소 추천을 요청했습니다 → 적절한 숙소를 1-2곳 추천해주세요
-     * 가격대 필터링: accommodation_info.price_range = "${formState.recommendationPreferences.priceRange}" 우선
-     * 숙소 유형 필터링: accommodation_info.accommodation_type = "${formState.recommendationPreferences.accommodationType}" 우선
-     * 권역 필터링: accommodation_info.region = "${formState.recommendationPreferences.region}" 우선
-     * 뷰 유형 필터링: accommodation_info.view_type = "${formState.recommendationPreferences.viewType}" 우선` :
+   - **숙소 스팟 활용**: categories에 "숙소" 포함된 스팟들만 숙소로 선택
+   - **숙소 지역 기반 선택**:
+     ${formState.accommodationStatus === 'not_booked' && formState.accommodationRegions.length > 0 ?
+       `* 각 일차별로 지정된 지역의 숙소 2-3개를 추천하세요:
+${formState.accommodationRegions.map((region, idx) => `       - ${idx + 1}일차: ${region} 지역의 숙소 (accommodation_info.region = "${region}")`).join('\n')}
+     * 숙소 추천 표기 형식:
+       - "현재 이 지역에 적당한 숙소로는 이렇게 추천드립니다:" 라는 문구 사용
+       - 각 숙소마다 다음 정보 포함:
+         * 숙소명
+         * 가격대 (accommodation_info.price_range)
+         * 체크인/체크아웃 시간 (accommodation_info.check_in_time, check_out_time)
+         * 숙소의 public_info.website_url이 있으면 링크 버튼 추가: [예약하기](URL)
+     * 동선 구성 시 해당 지역 중심의 숙소 GPS 좌표를 기준으로 효율적으로 짜주세요` :
        formState.accommodationStatus === 'booked' ?
-         `* 사용자가 이미 숙소를 정해두었습니다 → 추가 숙소 추천 불필요` :
-         `* 사용자가 숙소 추천을 원하지 않습니다 → 숙소 없이 일정만 작성`}
+         `* 사용자가 이미 숙소를 정해두었습니다 → 지정된 숙소 기준으로 동선 구성` :
+         `* ⚠️ 숙소가 지정되지 않았습니다 → 일정 생성 불가`}
    - **가격대 매칭**: 사용자 여행 스타일에 따라 accommodation_info.price_range 고려
      * "전체 저예산 위주" → "5만원 전후" 우선
      * "중간 (적당히 절약 + 포인트 투자)" → "5만원 전후", "10만원 전후" 균형
      * "고급 (숙소·식사·체험 모두 고급 위주)" → "10만원 전후", "20만원 이상" 우선
    - **동행자 고려**: accommodation_info.kid_friendly, pet_friendly 활용
-   - **체크인 시간**: accommodation_info.check_in_time, check_out_time 정확히 반영
+   - **체크인 시간**: 일반적으로 15:00, 체크아웃: 11:00
 7. **페이스에 따른 일정 조절**:
    - **여유롭게**:
      * 아침 일정 시작 시간: 10:00
@@ -429,6 +426,48 @@ ${spotData}
 ${oroomData}
 
 **⚠️ 중요: 위 데이터에 포함된 장소들만 사용해서 일정을 작성해주세요.**
+
+## 📝 출력 형식 (필수)
+
+**⚠️ 매우 중요: 일정 작성 시 반드시 다음 형식을 따라주세요:**
+
+1. **전체 여행 컨셉 요약**
+   - 맨 처음에 "## 전체 여행일정 컨셉 요약" 섹션을 작성하세요
+   - 여행 제목과 여행 전체의 컨셉/테마를 2-3문장으로 설명하세요
+
+2. **일차별 일정 구조**
+   - "전체 여행일정 컨셉 요약" 다음부터 바로 "## 1일차"로 시작하세요
+   - ⚠️ 공항 도착하는 날이 1일차입니다
+   - 각 일차는 반드시 "## 1일차", "## 2일차", "## 3일차" 등으로 시작하세요
+   - "Day 1", "Day 2", "첫째날", "여행 요약" 등의 표현은 절대 사용하지 마세요
+   - 총 ${formState.days}개의 일차만 작성하세요
+
+3. **구조 예시**
+\`\`\`
+## 전체 여행일정 컨셉 요약
+제주도 ${formState.nights}박 ${formState.days}일 여행 - [여행 테마 설명 2-3문장]
+
+## 1일차
+${formState.arrivalHour}:${formState.arrivalMinute} 제주공항 도착 및 렌터카 수령
+- 시간: 활동
+- 시간: 활동
+...
+
+## 2일차
+- 시간: 활동
+- 시간: 활동
+...
+
+## ${formState.days}일차
+- 시간: 활동
+...
+${formState.departureHour}:${formState.departureMinute} 제주공항 출발
+\`\`\`
+
+**⚠️ 절대 금지:**
+- "Day 1", "Day 2" 등의 영어 표현 사용 금지
+- "전체 여행일정 컨셉 요약"을 "Day 1"이나 "1일차"로 표기하지 마세요
+- 일정 요약을 별도 섹션으로 만들지 마세요
 `;
 
       const response = await ai.models.generateContent({
@@ -557,7 +596,7 @@ ${oroomData}
                         checked={formState.accommodationStatus === 'not_booked'}
                         onChange={(e) => {
                           handleUpdateForm('accommodationStatus', e.target.value as 'booked' | 'not_booked');
-                          handleUpdateForm('wantAccommodationRecommendation', false);
+                          handleUpdateForm('accommodationRegions', []);
                         }}
                         className="form-radio"
                       />
@@ -567,80 +606,37 @@ ${oroomData}
                 </div>
 
                 {formState.accommodationStatus === 'not_booked' && (
-                  <div className="space-y-4">
+                  <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">숙소 추천해 드릴까요?</label>
-                      <div className="space-x-4">
-                        <label className="inline-flex items-center">
-                          <input
-                            type="radio"
-                            value="yes"
-                            checked={formState.wantAccommodationRecommendation === true}
-                            onChange={() => handleUpdateForm('wantAccommodationRecommendation', true)}
-                            className="form-radio"
-                          />
-                          <span className="ml-2">네, 추천해 주세요</span>
-                        </label>
-                        <label className="inline-flex items-center">
-                          <input
-                            type="radio"
-                            value="no"
-                            checked={formState.wantAccommodationRecommendation === false}
-                            onChange={() => handleUpdateForm('wantAccommodationRecommendation', false)}
-                            className="form-radio"
-                          />
-                          <span className="ml-2">아니요, 괜찮습니다</span>
-                        </label>
+                      <label className="block text-sm font-medium text-gray-800 mb-2">
+                        🗺️ 원하는 숙소의 지역을 대략적으로 정해주세요
+                      </label>
+                      <p className="text-sm text-gray-600 mb-3">
+                        AI가 해당 지역의 숙소를 임의로 지정해서 여행 동선을 짜드립니다.<br/>
+                        ({formState.nights}박 여행이므로 <strong>{formState.nights}개 지역</strong>을 선택해주세요)
+                      </p>
+
+                      <div className="space-y-2">
+                        {Array.from({ length: formState.nights }).map((_, index) => (
+                          <div key={index} className="flex items-center gap-3">
+                            <span className="text-sm font-medium text-gray-700 w-16">
+                              {index + 1}일차:
+                            </span>
+                            <Select
+                              label=""
+                              value={formState.accommodationRegions[index] || ''}
+                              onChange={(e) => {
+                                const newRegions = [...formState.accommodationRegions];
+                                newRegions[index] = e.target.value;
+                                handleUpdateForm('accommodationRegions', newRegions);
+                              }}
+                              options={ACCOMMODATION_REGIONS}
+                              placeholder="지역을 선택하세요"
+                            />
+                          </div>
+                        ))}
                       </div>
                     </div>
-
-                    {formState.wantAccommodationRecommendation && (
-                      <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-800">숙소 추천 설정</h4>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <Select
-                            label="가격대 (1박 기준)"
-                            value={formState.recommendationPreferences.priceRange}
-                            onChange={(e) => handleUpdateForm('recommendationPreferences', {
-                              ...formState.recommendationPreferences,
-                              priceRange: e.target.value
-                            })}
-                            options={ACCOMMODATION_PRICE_RANGE_OPTIONS}
-                          />
-                          <Select
-                            label="숙소 유형"
-                            value={formState.recommendationPreferences.accommodationType}
-                            onChange={(e) => handleUpdateForm('recommendationPreferences', {
-                              ...formState.recommendationPreferences,
-                              accommodationType: e.target.value
-                            })}
-                            options={ACCOMMODATION_TYPE_OPTIONS}
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <Select
-                            label="선호 권역"
-                            value={formState.recommendationPreferences.region}
-                            onChange={(e) => handleUpdateForm('recommendationPreferences', {
-                              ...formState.recommendationPreferences,
-                              region: e.target.value
-                            })}
-                            options={ACCOMMODATION_REGIONS}
-                          />
-                          <Select
-                            label="뷰 유형"
-                            value={formState.recommendationPreferences.viewType}
-                            onChange={(e) => handleUpdateForm('recommendationPreferences', {
-                              ...formState.recommendationPreferences,
-                              viewType: e.target.value
-                            })}
-                            options={ACCOMMODATION_VIEW_TYPES}
-                          />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 

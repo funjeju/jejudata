@@ -57,6 +57,21 @@ export interface AccommodationInfo {
   google_maps_url?: string; // 구글 맵 링크
 }
 
+// 축제 및 행사 전용 정보
+export interface EventInfo {
+  event_type: "축제" | "공연" | "전시" | "문화행사" | "체험행사" | "기타";
+  start_date?: string; // ISO 날짜 또는 "매년 3월"
+  end_date?: string; // ISO 날짜 또는 "매년 3월"
+  seasons?: string[]; // ["봄", "여름", "가을", "겨울"]
+  months?: string[]; // ["1월", "2월", "3월", ...]
+  is_annual: boolean; // 연례 행사 여부
+  admission_fee?: string; // 입장료 정보
+  reservation_required: boolean; // 예약 필요 여부
+  target_audience?: string[]; // 대상 (가족, 연인, 친구 등)
+  event_scale: "소규모" | "중규모" | "대규모"; // 행사 규모
+  duration_days?: number; // 행사 기간 (일 수)
+}
+
 // 관심사 매핑을 위한 새로운 인터페이스들
 export interface ViewInfo {
   ocean_view: boolean;
@@ -164,6 +179,9 @@ export interface Place {
 
   // 숙소 전용 정보
   accommodation_info?: AccommodationInfo | null;
+
+  // 축제/행사 전용 정보
+  event_info?: EventInfo | null;
 
   // For collaboration and versioning
   suggestions?: Record<string, Suggestion[]>;
@@ -375,4 +393,38 @@ export interface TravelItinerary {
   };
   generatedAt: Date;
   aiStory?: string; // AI가 생성한 여행 스토리
+}
+
+// 뉴스/최신 소식 시스템
+export interface NewsItem {
+  id: string;
+  type: 'new_spot' | 'update' | 'closure' | 'seasonal' | 'event' | 'trending' | 'menu_change' | 'price_change';
+  title: string;
+  content: string;
+  published_at: Timestamp;
+  expires_at?: Timestamp; // 계절성 소식은 만료일 설정
+
+  // 관련 스팟 연결 (자동 적용)
+  related_spot_ids: string[]; // 여러 스팟 연결 가능
+  auto_apply_to_spot: boolean; // true면 스팟 상세에 자동 표시
+
+  // 시각적 요소
+  thumbnail_url?: string;
+  badge?: '신규' | '인기' | '계절한정' | '마감임박' | '핫플' | '개화중' | '폐업' | '휴업';
+
+  // 우선순위
+  priority: number; // 1-10, 높을수록 상단 노출
+  is_pinned: boolean; // 상단 고정
+
+  // 챗봇용 메타데이터
+  keywords?: string[]; // 챗봇이 검색할 키워드 (예: ["벚꽃", "개화", "새별오름"])
+  season?: string; // 계절 정보
+  month?: string; // 월 정보
+  region?: string; // 지역 정보
+
+  // 메타
+  tags?: string[];
+  author?: string;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }

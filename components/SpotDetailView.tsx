@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Place, Suggestion, EditLog } from '../types';
+import type { Place, Suggestion, EditLog, NewsItem } from '../types';
 import Card from './common/Card';
 import Button from './common/Button';
 import SuggestionIcon from './SuggestionIcon';
@@ -16,6 +16,7 @@ const IconCalendarOff: React.FC = () => <svg xmlns="http://www.w3.org/2000/svg" 
 
 interface SpotDetailViewProps {
   spot: Place;
+  relatedNews?: NewsItem[];
   onBack: () => void;
   onEdit: (spot: Place) => void;
   onAddSuggestion: (placeId: string, fieldPath: string, content: string) => void;
@@ -95,9 +96,39 @@ const AttributeItem: React.FC<{ label: string; value: string | string[]; baseOpt
     );
 }
 
-const SpotDetailView: React.FC<SpotDetailViewProps> = ({ spot, onBack, onEdit, onAddSuggestion, onResolveSuggestion }) => {
+const SpotDetailView: React.FC<SpotDetailViewProps> = ({ spot, relatedNews = [], onBack, onEdit, onAddSuggestion, onResolveSuggestion }) => {
   const commonCommentableProps = { spot, onAddSuggestion, onResolveSuggestion };
-  
+
+  const getBadgeColor = (badge?: NewsItem['badge']) => {
+    const colorMap: Record<string, string> = {
+      '신규': 'bg-blue-100 text-blue-800',
+      '인기': 'bg-red-100 text-red-800',
+      '계절한정': 'bg-green-100 text-green-800',
+      '마감임박': 'bg-orange-100 text-orange-800',
+      '핫플': 'bg-pink-100 text-pink-800',
+      '개화중': 'bg-purple-100 text-purple-800',
+      '폐업': 'bg-gray-100 text-gray-800',
+      '휴업': 'bg-yellow-100 text-yellow-800',
+    };
+    return badge ? colorMap[badge] || 'bg-gray-100 text-gray-800' : '';
+  };
+
+  const formatTimeAgo = (timestamp: { seconds: number }) => {
+    const now = Date.now() / 1000;
+    const diff = now - timestamp.seconds;
+
+    if (diff < 3600) {
+      const minutes = Math.floor(diff / 60);
+      return `${minutes}분 전`;
+    } else if (diff < 86400) {
+      const hours = Math.floor(diff / 3600);
+      return `${hours}시간 전`;
+    } else {
+      const days = Math.floor(diff / 86400);
+      return `${days}일 전`;
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex justify-between items-center mb-4">
@@ -129,6 +160,48 @@ const SpotDetailView: React.FC<SpotDetailViewProps> = ({ spot, onBack, onEdit, o
             ))}
           </div>
         </header>
+
+        {/* --- Latest News Section --- */}
+        {relatedNews.length > 0 && (
+          <section className="border-t pt-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">📰 최신 소식</h2>
+            <div className="space-y-3">
+              {relatedNews.map((newsItem) => (
+                <div
+                  key={newsItem.id}
+                  className="bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-orange-400 p-4 rounded-r-lg"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      {newsItem.badge && (
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getBadgeColor(newsItem.badge)}`}>
+                          {newsItem.badge}
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-500">
+                        {formatTimeAgo(newsItem.published_at)}
+                      </span>
+                    </div>
+                  </div>
+                  <h3 className="font-bold text-gray-900 mb-1">{newsItem.title}</h3>
+                  <p className="text-sm text-gray-700">{newsItem.content}</p>
+                  {newsItem.keywords && newsItem.keywords.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {newsItem.keywords.map((keyword, idx) => (
+                        <span
+                          key={idx}
+                          className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded"
+                        >
+                          #{keyword}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* --- Basic Info Section --- */}
         <section className="border-t pt-6">

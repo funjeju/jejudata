@@ -568,7 +568,7 @@ ${currentInput}
                 else if (parsedJson.weatherInquiry) {
                     const { locationQuery, responseText } = parsedJson.weatherInquiry;
 
-                    // 키워드 매칭으로 소스 찾기
+                    // 키워드 매칭으로 소스 찾기 (더 엄격한 매칭)
                     const matchedSource = weatherSources.find(s => {
                         if (!isYouTubeUrl(s.youtubeUrl)) return false;
 
@@ -578,11 +578,10 @@ ${currentInput}
                         // 제목에서 직접 매칭
                         if (title.includes(query)) return true;
 
-                        // 키워드 배열에서 매칭
+                        // 키워드 배열에서 매칭 (단방향만 허용 - 키워드가 검색어에 포함되는 경우만)
                         if (s.keywords) {
                             return s.keywords.some(keyword =>
-                                keyword.toLowerCase().includes(query) ||
-                                query.includes(keyword.toLowerCase())
+                                keyword.toLowerCase().includes(query)
                             );
                         }
 

@@ -1,8 +1,10 @@
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
-import type { Place, InitialFormData, Suggestion, EditLog, WeatherSource, OroomData } from './types';
+import type { Place, InitialFormData, Suggestion, EditLog, WeatherSource, OroomData, NewsItem } from './types';
 import CategoryForm from './components/CategoryForm';
 import InitialForm from './components/InitialForm';
+import EventForm, { type EventFormData } from './components/EventForm';
+import NewsForm from './components/NewsForm';
 import ReviewDashboard from './components/ReviewDashboard';
 import ContentLibrary from './components/ContentLibrary';
 import SpotDetailView from './components/SpotDetailView';
@@ -10,6 +12,7 @@ import Chatbot from './components/Chatbot';
 import WeatherChatModal from './components/WeatherChatModal';
 import TripPlannerModal from './components/TripPlannerModal';
 import OroomDBModal from './components/OroomDBModal';
+import NewsFeedModal from './components/NewsFeedModal';
 import VideoViewer from './components/VideoViewer';
 import Spinner from './components/common/Spinner';
 import Modal from './components/common/Modal';
@@ -20,10 +23,11 @@ import { collection, query, onSnapshot, setDoc, doc, deleteDoc, getDocs } from "
 import { db } from './services/firebase';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { sanitizePlaceForFirestore, parsePlaceFromFirestore } from './services/placeFirestore';
+import { subscribeToNews, saveNewsItem, deleteNewsItem } from './services/newsFirestore';
 import { testWeatherAPI, getCurrentWeather, JEJU_WEATHER_STATIONS } from './services/weatherService';
 import { testCapture, captureWeatherScene } from './services/youtubeCapture';
 
-type AppStep = 'library' | 'category' | 'initial' | 'loading' | 'review' | 'view';
+type AppStep = 'library' | 'category' | 'initial' | 'event' | 'news' | 'loading' | 'review' | 'view';
 
 // Utility to set a value in a nested object using a string path
 // This is a simplified version and might not cover all edge cases like lodash.set
@@ -66,8 +70,11 @@ const App: React.FC = () => {
   const [isOroomDBOpen, setIsOroomDBOpen] = useState(false);
   const [weatherSources, setWeatherSources] = useState<WeatherSource[]>([]);
   const [orooms, setOrooms] = useState<OroomData[]>([]);
+  const [news, setNews] = useState<NewsItem[]>([]);
   const [isLoadingSpots, setIsLoadingSpots] = useState(true);
   const [isLoadingOrooms, setIsLoadingOrooms] = useState(true);
+  const [isNewsFeedOpen, setIsNewsFeedOpen] = useState(false);
+  const [newsToEdit, setNewsToEdit] = useState<NewsItem | null>(null);
 // 스팟 데이터 실시간 리스너
   useEffect(() => {
     console.log('Firestore 실시간 리스너 설정 중...');
@@ -156,6 +163,17 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  // 뉴스 데이터 실시간 리스너
+  useEffect(() => {
+    console.log('News Firestore 실시간 리스너 설정 중...');
+    const unsubscribe = subscribeToNews((newsArray) => {
+      setNews(newsArray);
+      console.log(`Firestore에서 실시간으로 뉴스 ${newsArray.length}개를 불러왔습니다.`);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
 
   const handleGenerateDraft = useCallback(async (formData: InitialFormData) => {
 
@@ -222,18 +240,71 @@ const App: React.FC = () => {
   
   const handleGoBack = useCallback(() => {
     if (step === 'review') {
-      setStep('initial');
+      // Check if this is an event, return to event form
+      if (dataToEdit?.categories?.includes('축제 및 행사')) {
+        setStep('event');
+      } else {
+        setStep('initial');
+      }
     } else if (step === 'initial') {
       setStep('category');
-    } else if (step === 'category') {
+    } else if (step === 'category' || step === 'event' || step === 'news') {
       setDataToEdit(null);
       setCategoryFormData(null);
+      setNewsToEdit(null);
       setStep('library');
     } else if (step === 'view') {
         setSpotToView(null);
         setStep('library');
     }
-  }, [step]);
+  }, [step, dataToEdit]);
+
+  const handleStartNews = () => {
+    setNewsToEdit(null);
+    setStep('news');
+  };
+
+  const handleNewsSubmit = async (newsItem: NewsItem, thumbnailFile?: File) => {
+    try {
+      let finalNewsItem = { ...newsItem };
+
+      // 이미지 파일이 있으면 Firebase Storage에 업로드
+      if (thumbnailFile) {
+        const storage = getStorage();
+        const imageRef = ref(storage, `news/${newsItem.id}/${thumbnailFile.name}`);
+        await uploadBytes(imageRef, thumbnailFile);
+        const downloadURL = await getDownloadURL(imageRef);
+        finalNewsItem.thumbnail_url = downloadURL;
+        console.log('이미지 업로드 완료:', downloadURL);
+      }
+
+      await saveNewsItem(finalNewsItem);
+      console.log('뉴스 저장 완료:', finalNewsItem.title);
+      setNewsToEdit(null);
+      setStep('library');
+      // 뉴스 피드 모달 자동 열기
+      setIsNewsFeedOpen(true);
+    } catch (error) {
+      console.error('뉴스 저장 실패:', error);
+      alert('뉴스 저장에 실패했습니다. 다시 시도해주세요.');
+    }
+  };
+
+  const handleEditNews = (newsItem: NewsItem) => {
+    setNewsToEdit(newsItem);
+    setStep('news');
+    setIsNewsFeedOpen(false);
+  };
+
+  const handleDeleteNews = async (newsId: string) => {
+    try {
+      await deleteNewsItem(newsId);
+      console.log('뉴스 삭제 완료:', newsId);
+    } catch (error) {
+      console.error('뉴스 삭제 실패:', error);
+      alert('뉴스 삭제에 실패했습니다. 다시 시도해주세요.');
+    }
+  };
 
   // 데이터 저장 함수 (로컬 스토리지 + Firestore 백업)
   const handleSaveToFirebase = async (data: Place) => {
@@ -543,9 +614,50 @@ const App: React.FC = () => {
     setStep('category');
   };
 
+  const handleStartEvent = () => {
+    setDataToEdit(null);
+    setCategoryFormData(null);
+    setStep('event');
+  };
+
   const handleCategorySubmit = (data: {spotName: string, categories: string[]}) => {
     setCategoryFormData(data);
     setStep('initial');
+  };
+
+  const handleEventSubmit = (eventData: EventFormData) => {
+    const now = Date.now() / 1000;
+    const timestamp = { seconds: now, nanoseconds: 0 };
+
+    const eventPlace: Place = {
+      place_id: `P_${new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15)}_${Math.random().toString(36).substring(2, 4).toUpperCase()}`,
+      place_name: eventData.eventName,
+      creator_id: 'expert_001',
+      status: 'draft',
+      categories: ['축제 및 행사'],
+      region: eventData.region || null,
+      address: eventData.address || null,
+      expert_tip_raw: eventData.eventDescription,
+      import_url: eventData.importUrl,
+      event_info: eventData.eventInfo,
+      created_at: timestamp,
+      updated_at: timestamp,
+      images: [],
+      linked_spots: [],
+      comments: [],
+      average_duration_minutes: null,
+      attributes: {
+        targetAudience: eventData.eventInfo.target_audience || [],
+        recommendedSeasons: eventData.eventInfo.seasons || [],
+        withKids: WITH_KIDS_OPTIONS[1],
+        withPets: WITH_PETS_OPTIONS[2],
+        parkingDifficulty: PARKING_DIFFICULTY_OPTIONS[1],
+        admissionFee: eventData.eventInfo.admission_fee || ADMISSION_FEE_OPTIONS[2],
+      },
+    };
+
+    setDataToEdit(eventPlace);
+    setStep('review');
   };
 
   const handleEditSpot = (spot: Place) => {
@@ -663,19 +775,28 @@ const App: React.FC = () => {
         }
         return <ContentLibrary
                   spots={spots}
+                  news={news}
                   onAddNew={handleStartNew}
+                  onAddEvent={handleStartEvent}
+                  onAddNews={handleStartNews}
                   onEdit={handleEditSpot}
                   onView={handleViewSpot}
                   onDelete={handleDeleteSpot}
                   onOpenWeatherChat={() => setIsWeatherChatOpen(true)}
                   onOpenTripPlanner={() => setIsTripPlannerOpen(true)}
                   onOpenOroomDB={() => setIsOroomDBOpen(true)}
+                  onOpenNewsFeed={() => setIsNewsFeedOpen(true)}
                 />;
       case 'view':
         if (spotToView) {
-            return <SpotDetailView 
-                        spot={spotToView} 
-                        onBack={handleGoBack} 
+            // 이 스팟 관련 뉴스 필터링
+            const spotNews = news.filter(n =>
+              n.auto_apply_to_spot && n.related_spot_ids.includes(spotToView.place_id)
+            );
+            return <SpotDetailView
+                        spot={spotToView}
+                        relatedNews={spotNews}
+                        onBack={handleGoBack}
                         onEdit={handleEditSpot}
                         onAddSuggestion={handleAddSuggestion}
                         onResolveSuggestion={handleResolveSuggestion}
@@ -683,6 +804,10 @@ const App: React.FC = () => {
         }
         setStep('library');
         return null;
+      case 'event':
+        return <EventForm onSubmit={handleEventSubmit} onBack={handleGoBack} />;
+      case 'news':
+        return <NewsForm onSubmit={handleNewsSubmit} onBack={handleGoBack} spots={spots} initialValues={newsToEdit || undefined} />;
       case 'category': {
         const categoryInitialValues = dataToEdit ? {
             spotName: dataToEdit.place_name,
@@ -808,6 +933,7 @@ const App: React.FC = () => {
             onClose={() => setIsChatbotOpen(false)}
             spots={spots}
             orooms={orooms}
+            news={news}
             onNavigateToSpot={handleNavigateFromChatbot}
         />
 
@@ -829,6 +955,16 @@ const App: React.FC = () => {
         <OroomDBModal
           isOpen={isOroomDBOpen}
           onClose={() => setIsOroomDBOpen(false)}
+        />
+
+        <NewsFeedModal
+          isOpen={isNewsFeedOpen}
+          onClose={() => setIsNewsFeedOpen(false)}
+          news={news}
+          spots={spots}
+          onAddNews={handleStartNews}
+          onEditNews={handleEditNews}
+          onDeleteNews={handleDeleteNews}
         />
     </div>
   );

@@ -2,7 +2,7 @@ import React from 'react';
 
 export const CATEGORIES = [
   "오름", "바다", "숲길", "올레길", "관광지",
-  "포토존", "식당", "카페", "체험", "꽃", "역사문화", "숙소", "히든플레이스"
+  "포토존", "식당", "카페", "체험", "꽃", "역사문화", "숙소", "히든플레이스", "축제 및 행사"
 ];
 
 export const TARGET_AUDIENCE_GROUPS: Record<string, string[]> = {

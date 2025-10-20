@@ -1,23 +1,28 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Place, OroomData } from '../types';
+import type { Place, OroomData, NewsItem } from '../types';
 import { CATEGORIES, REGIONS } from '../constants';
 import Button from './common/Button';
 import Card from './common/Card';
 import Input from './common/Input';
 import ExportModal from './ExportModal';
 import GoogleMapView from './GoogleMapView';
+import NewsCarousel from './NewsCarousel';
 import { subscribeToOrooms } from '../services/oroomFirestore';
 
 interface ContentLibraryProps {
   spots: Place[];
+  news: NewsItem[];
   onAddNew: () => void;
+  onAddEvent: () => void;
+  onAddNews: () => void;
   onEdit: (spot: Place) => void;
   onView: (spot: Place) => void;
   onDelete: (spot: Place) => void;
   onOpenWeatherChat: () => void;
   onOpenTripPlanner: () => void;
   onOpenOroomDB?: () => void;
+  onOpenNewsFeed: () => void;
 }
 
 const STATUS_OPTIONS = ['draft', 'published', 'rejected', 'stub'];
@@ -49,7 +54,7 @@ const StatusBadge: React.FC<{ status: Place['status']; onClick?: () => void }> =
 };
 
 
-const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit, onView, onDelete, onOpenWeatherChat, onOpenTripPlanner, onOpenOroomDB }) => {
+const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, news, onAddNew, onAddEvent, onAddNews, onEdit, onView, onDelete, onOpenWeatherChat, onOpenTripPlanner, onOpenOroomDB, onOpenNewsFeed }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -136,6 +141,12 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
 
   return (
     <>
+      {/* 뉴스 캐러셀 */}
+      <NewsCarousel
+        news={news}
+        onViewAll={onOpenNewsFeed}
+      />
+
       <Card>
       <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
         <h2 className="text-2xl font-bold text-gray-800">콘텐츠 라이브러리</h2>
@@ -186,6 +197,18 @@ const ContentLibrary: React.FC<ContentLibraryProps> = ({ spots, onAddNew, onEdit
             <div className="flex items-center gap-2 border-l border-gray-300 pl-4 ml-2">
                 <Button onClick={() => setIsExportModalOpen(true)} variant="secondary">내보내기</Button>
                 <Button onClick={onAddNew}>+ 새 스팟 추가</Button>
+                <Button
+                  onClick={onAddEvent}
+                  className="bg-purple-500 text-white hover:bg-purple-600 focus:ring-purple-400"
+                >
+                  🎉 축제 및 행사
+                </Button>
+                <Button
+                  onClick={onAddNews}
+                  className="bg-orange-500 text-white hover:bg-orange-600 focus:ring-orange-400"
+                >
+                  📰 최신 소식
+                </Button>
             </div>
         </div>
       </div>

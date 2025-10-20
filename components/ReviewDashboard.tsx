@@ -16,7 +16,8 @@ import {
   ACCOMMODATION_VIEW_TYPE_OPTIONS,
   KID_FRIENDLY_OPTIONS,
   PET_FRIENDLY_OPTIONS,
-  BREAKFAST_OPTIONS
+  BREAKFAST_OPTIONS,
+  CATEGORIES
 } from '../constants';
 import Button from './common/Button';
 import Card from './common/Card';
@@ -123,10 +124,16 @@ const ReviewDashboard: React.FC<ReviewDashboardProps> = ({ initialData, onSave, 
     }));
   };
 
-  const handleTagsChange = (tagsString: string) => {
-    const tagsArray = tagsString.split(',').map(tag => tag.trim()).filter(Boolean);
+  const [tagInput, setTagInput] = useState((initialData.tags || []).join(', '));
+
+  const handleTagsChange = (value: string) => {
+    setTagInput(value);
+  };
+
+  const handleTagsBlur = () => {
+    const tagsArray = tagInput.split(/[,\s]+/).map(tag => tag.trim()).filter(Boolean);
     handleInputChange('tags', tagsArray);
-  }
+  };
 
   const handleCommentChange = (index: number, field: keyof Comment, value: string) => {
     const newComments = [...(data.comments || [])];
@@ -209,12 +216,20 @@ const ReviewDashboard: React.FC<ReviewDashboardProps> = ({ initialData, onSave, 
             <h3 className="font-semibold text-lg mb-4">기본 정보</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input label="스팟 이름" value={data.place_name} onChange={e => handleInputChange('place_name', e.target.value)} />
-              <Select 
-                label="상태" 
-                value={data.status} 
+              <Select
+                label="상태"
+                value={data.status}
                 onChange={e => handleInputChange('status', e.target.value as Place['status'])}
-                options={['draft', 'published', 'rejected']} 
+                options={['draft', 'published', 'rejected']}
               />
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">카테고리 (복수 선택 가능)</label>
+                <CheckboxGroup
+                  options={CATEGORIES}
+                  selectedValues={data.categories || []}
+                  onChange={(selected) => handleInputChange('categories', selected)}
+                />
+              </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">주소 및 GPS 좌표</label>
                 <AddressGpsInput
@@ -241,7 +256,7 @@ const ReviewDashboard: React.FC<ReviewDashboardProps> = ({ initialData, onSave, 
                 </Select>
             </div>
             <div className="mt-4">
-                <Input label="태그 (쉼표로 구분)" value={(data.tags || []).join(', ')} onChange={e => handleTagsChange(e.target.value)} placeholder="예: #인생샷, #오션뷰, #분위기좋은" />
+                <Input label="태그 (쉼표 또는 스페이스로 구분)" value={tagInput} onChange={e => handleTagsChange(e.target.value)} onBlur={handleTagsBlur} placeholder="예: #인생샷, #오션뷰, #분위기좋은" />
             </div>
           </Card>
 
@@ -249,7 +264,14 @@ const ReviewDashboard: React.FC<ReviewDashboardProps> = ({ initialData, onSave, 
             <h3 className="font-semibold text-lg mb-4">공개 정보</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                <Input label="운영 시간" value={data.public_info?.operating_hours || ''} onChange={e => handlePublicInfoChange('operating_hours', e.target.value)} placeholder="예: 09:00 - 18:00 (월요일 휴무)" />
-               <Input label="정기 휴무일 (쉼표로 구분)" value={data.public_info?.closed_days?.join(', ') || ''} onChange={e => handlePublicInfoChange('closed_days', e.target.value.split(',').map(t => t.trim()).filter(Boolean))} placeholder="예: 월요일, 화요일" />
+               <Input
+                 label="정기 휴무일 (쉼표로 구분)"
+                 value={data.public_info?.closed_days?.join(', ') || ''}
+                 onChange={e => handlePublicInfoChange('closed_days', e.target.value.split(',').map(t => t.trim()).filter(Boolean))}
+                 placeholder="예: 월요일, 화요일"
+                 type="text"
+                 autoComplete="off"
+               />
                <Input label="연락처" value={data.public_info?.phone_number || ''} onChange={e => handlePublicInfoChange('phone_number', e.target.value)} placeholder="예: 064-123-4567"/>
                <Input label="웹사이트 URL" value={data.public_info?.website_url || ''} onChange={e => handlePublicInfoChange('website_url', e.target.value)} placeholder="예: https://instagram.com/jeju_spot"/>
                {data.categories?.includes('식당') && (

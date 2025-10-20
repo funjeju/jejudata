@@ -1,12 +1,13 @@
 import React from 'react';
 
 interface CheckboxGroupProps {
-  label: string;
+  label?: string;
   // Use either options or optionGroups
   options?: string[];
   optionGroups?: Record<string, string[]>;
-  selectedOptions: string[];
-  onChange: (option: string) => void;
+  selectedOptions?: string[]; // 기존
+  selectedValues?: string[]; // 새로운 prop 추가
+  onChange: (option: string | string[]) => void; // string[] 타입도 허용
   baseOption?: string;
   className?: string;
   onSelectAll?: (allOptions: string[]) => void;
@@ -17,12 +18,15 @@ const CheckboxGroup: React.FC<CheckboxGroupProps> = ({
   options,
   optionGroups,
   selectedOptions,
+  selectedValues, // 새로운 prop
   onChange,
   baseOption,
   className = '',
   onSelectAll
 }) => {
-  const isBaseSelected = baseOption ? selectedOptions.includes(baseOption) : false;
+  // selectedValues 또는 selectedOptions 사용 (둘 다 지원)
+  const selected = selectedValues || selectedOptions || [];
+  const isBaseSelected = baseOption ? selected.includes(baseOption) : false;
 
   const handleBaseOptionClick = (option: string) => {
     if (option === baseOption && onSelectAll) {
@@ -32,7 +36,16 @@ const CheckboxGroup: React.FC<CheckboxGroupProps> = ({
         : options || [];
       onSelectAll(allOptions);
     } else {
-      onChange(option);
+      // selectedValues prop이 사용되는 경우 (배열 전체를 반환)
+      if (selectedValues !== undefined) {
+        const newSelected = selected.includes(option)
+          ? selected.filter(o => o !== option)
+          : [...selected, option];
+        onChange(newSelected);
+      } else {
+        // 기존 방식 (단일 옵션 토글)
+        onChange(option);
+      }
     }
   };
 
@@ -46,7 +59,7 @@ const CheckboxGroup: React.FC<CheckboxGroupProps> = ({
           <input
             type="checkbox"
             className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-            checked={selectedOptions.includes(option)}
+            checked={selected.includes(option)}
             onChange={() => handleBaseOptionClick(option)}
           />
           <span className="text-sm text-gray-800">{option}</span>
@@ -60,7 +73,7 @@ const CheckboxGroup: React.FC<CheckboxGroupProps> = ({
 
   return (
     <div className={className}>
-      <label className="block text-sm font-medium text-gray-700">{label}</label>
+      {label && <label className="block text-sm font-medium text-gray-700">{label}</label>}
       <div className="mt-2 space-y-4">
         {/* Render base group if it exists */}
         {baseGroupKey && (

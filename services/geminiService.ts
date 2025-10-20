@@ -585,7 +585,7 @@ const spotScoringSchema = {
 };
 
 export const scoreCandidateSpots = async (
-    candidateSpots: Array<{ place_id: string; place_name: string; interest_tags?: string[]; trend_info?: any; attributes?: any; category_specific_info?: any }>,
+    candidateSpots: Array<{ place_id: string; place_name: string; interest_tags?: string[]; trend_info?: any; attributes?: any; category_specific_info?: any; public_info?: any }>,
     filterRequest: ItineraryFilterRequest
 ): Promise<SpotScore[]> => {
 
@@ -597,7 +597,9 @@ export const scoreCandidateSpots = async (
         trend: spot.trend_info?.trend_status || '정보없음',
         popularity: spot.trend_info?.popularity_level || '정보없음',
         targetAudience: spot.attributes?.targetAudience || [],
-        priceRange: spot.category_specific_info?.priceRange || '정보없음'
+        priceRange: spot.category_specific_info?.priceRange || '정보없음',
+        operating_hours: spot.public_info?.operating_hours || '정보없음',
+        closed_days: spot.public_info?.closed_days || []
     }));
 
     const prompt = `
@@ -633,10 +635,16 @@ ${JSON.stringify(spotsInfo, null, 2)}
    - 히든플레이스: trend_status가 '숨은명소'인지
    - 혼잡 회피: popularity_level이 '한적함' 또는 '보통'인지
 
+## 영업시간 정보 활용
+- **operating_hours**: "09:00~17:00" 같은 형식으로 제공됨
+- **closed_days**: 정기 휴무일 배열 (예: ["월요일", "화요일"])
+- AI가 직접 시간 체크는 하지 않고, 영업시간이 명확한 스팟에 신뢰도 가산점 부여 가능
+
 ## 특별 규칙
 - **필수 방문지**로 지정된 스팟은 무조건 90-100점 부여
 - 관심사가 전혀 맞지 않으면 30점 미만
 - 여러 관심사와 일치하면 가산점
+- 영업시간이 명확히 기재된 스팟은 신뢰도가 높음
 
 # OUTPUT
 JSON 형식으로 각 스팟의 점수와 이유를 반환하세요.
