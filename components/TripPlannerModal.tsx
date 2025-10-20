@@ -1022,8 +1022,19 @@ ${formState.departureHour}:${formState.departureMinute} 제주공항 출발
             <div className="mb-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-gray-900">🤖 여행일정 AI</h2>
-                <div className="text-sm text-gray-500">
-                  {currentStep + 1} / {STEPS.length}
+                <div className="flex items-center gap-4">
+                  <div className="text-sm text-gray-500">
+                    {currentStep + 1} / {STEPS.length}
+                  </div>
+                  <button
+                    onClick={onClose}
+                    className="text-gray-400 hover:text-gray-800 transition-colors"
+                    aria-label="Close"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
               </div>
 
@@ -1109,12 +1120,25 @@ ${formState.departureHour}:${formState.departureMinute} 제주공항 출발
         {finalItinerary && (
           <div className="space-y-6">
             <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold mb-2">
-                <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                  ✨ 맞춤 여행일정이 완성되었어요!
-                </span>
-              </h3>
-              <p className="text-gray-600">아래 일정을 참고해서 즐거운 제주여행 되세요 🌺</p>
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex-1">
+                  <h3 className="text-2xl font-bold mb-2">
+                    <span className="bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                      ✨ 맞춤 여행일정이 완성되었어요!
+                    </span>
+                  </h3>
+                  <p className="text-gray-600">아래 일정을 참고해서 즐거운 제주여행 되세요 🌺</p>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="text-gray-400 hover:text-gray-800 transition-colors"
+                  aria-label="Close"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div className="max-h-96 overflow-y-auto border rounded-lg p-4 bg-gray-50">

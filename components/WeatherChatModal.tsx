@@ -798,7 +798,8 @@ ${source.weatherData ? `
         }
       >
         <div className="flex flex-col h-[70vh] max-h-[600px]">
-          <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b gap-y-2">
+          {/* 관리 버튼들 숨김 - 사용자 화면에서는 불필요 */}
+          {/* <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b gap-y-2">
             <h4 className="text-lg font-semibold text-gray-700">정보 소스 관리</h4>
             <div className="flex space-x-2 flex-wrap justify-end gap-y-2">
               <Button onClick={() => setIsListModalOpen(true)} variant="secondary">목록 보기 및 편집</Button>
@@ -812,9 +813,9 @@ ${source.weatherData ? `
                 실시간 영상으로 날씨보기
               </Button>
             </div>
-          </header>
-          
-          <main className="flex-1 my-4 p-2 overflow-y-auto bg-gray-100 rounded-lg">
+          </header> */}
+
+          <main className="flex-1 p-2 overflow-y-auto bg-gray-100 rounded-lg">
             <div className="space-y-4 p-2">
               {messages.map((msg, index) => (
                 <div key={index}>
