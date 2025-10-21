@@ -214,7 +214,9 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, orooms, news,
           season: n.season,
           month: n.month,
           region: n.region,
-          published_at: new Date(n.published_at.seconds * 1000).toLocaleDateString('ko-KR')
+          published_at: n.published_at && n.published_at.seconds
+            ? new Date(n.published_at.seconds * 1000).toLocaleDateString('ko-KR')
+            : '최근'
         })), null, 2)}
         \`\`\`
         ${locationContext}

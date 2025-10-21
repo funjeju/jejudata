@@ -13,7 +13,10 @@
       "Bash(git checkout HEAD~1)",
       "Bash(git checkout HEAD -- package.json package-lock.json index.tsx)",
       "Bash(npm install)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nReact Router 적용 및 빌드 오류 수정\n\n주요 변경사항:\n- index.html: <style> 태그 제거 (Vite 빌드 오류 원인)\n  * 커스텀 스크롤바 스타일 제거\n  * Tailwind CSS CDN은 유지\n\n- index.tsx: React Router로 라우팅 전환\n  * BrowserRouter, Routes, Route 사용\n  * /admin → App (CMS 관리자)\n  * / → UserApp (사용자 앱)\n  * window.location.pathname 조건문 제거\n\n- package.json: react-router-dom 의존성 추가\n  * v7.5.0 설치\n\n빌드 결과:\n- 빌드 성공 (10.39s)\n- 번들 크기: index.js 1.84MB (gzip 493KB)\n- Firebase Hosting 배포 준비 완료\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+      "Bash(git commit -m \"$(cat <<''EOF''\nReact Router 적용 및 빌드 오류 수정\n\n주요 변경사항:\n- index.html: <style> 태그 제거 (Vite 빌드 오류 원인)\n  * 커스텀 스크롤바 스타일 제거\n  * Tailwind CSS CDN은 유지\n\n- index.tsx: React Router로 라우팅 전환\n  * BrowserRouter, Routes, Route 사용\n  * /admin → App (CMS 관리자)\n  * / → UserApp (사용자 앱)\n  * window.location.pathname 조건문 제거\n\n- package.json: react-router-dom 의존성 추가\n  * v7.5.0 설치\n\n빌드 결과:\n- 빌드 성공 (10.39s)\n- 번들 크기: index.js 1.84MB (gzip 493KB)\n- Firebase Hosting 배포 준비 완료\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(firebase deploy --only hosting)",
+      "Bash(git push)",
+      "Bash(git commit -m \"$(cat <<''EOF''\n가이드챗봇 타임스탬프 에러 수정\n\n주요 변경사항:\n- Chatbot.tsx: 뉴스 published_at null 체크 추가\n  * published_at.seconds 접근 전 존재 여부 확인\n  * undefined/null인 경우 ''최근''으로 표시\n  * TypeError 방지\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
