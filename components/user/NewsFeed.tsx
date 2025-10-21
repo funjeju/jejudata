@@ -8,9 +8,10 @@ interface NewsFeedProps {
   spots: Place[];
   onNewsClick: (news: NewsItem) => void;
   onAddNewsClick: () => void;
+  onEditNews: (news: NewsItem) => void;
 }
 
-const NewsFeed: React.FC<NewsFeedProps> = ({ news, spots, onNewsClick, onAddNewsClick }) => {
+const NewsFeed: React.FC<NewsFeedProps> = ({ news, spots, onNewsClick, onAddNewsClick, onEditNews }) => {
   const [filterType, setFilterType] = useState<NewsItem['type'] | 'all'>('all');
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
 
@@ -113,6 +114,7 @@ const NewsFeed: React.FC<NewsFeedProps> = ({ news, spots, onNewsClick, onAddNews
             selectedNews.related_spot_ids.includes(s.place_id)
           )}
           onClose={() => setSelectedNews(null)}
+          onEdit={onEditNews}
         />
       )}
     </div>

@@ -7,7 +7,7 @@ import SpotDetailModal from './components/user/SpotDetailModal';
 import Chatbot from './components/Chatbot';
 import WeatherChatModal from './components/WeatherChatModal';
 import TripPlannerModal from './components/TripPlannerModal';
-import AdminLoginModal from './components/user/AdminLoginModal';
+import AuthModal from './components/user/AuthModal';
 import NewsWriteModal from './components/user/NewsWriteModal';
 import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from './services/firebase';
@@ -19,7 +19,7 @@ import { useAuth } from './contexts/AuthContext';
 type ModalType = 'weather' | 'guide' | 'tripPlanner' | 'newsFeed' | null;
 
 const UserApp: React.FC = () => {
-  const { isAuthenticated } = useAuth();
+  const { currentUser } = useAuth();
 
   // 데이터 상태
   const [spots, setSpots] = useState<Place[]>([]);
@@ -33,6 +33,7 @@ const UserApp: React.FC = () => {
   const [selectedSpot, setSelectedSpot] = useState<Place | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showNewsWriteModal, setShowNewsWriteModal] = useState(false);
+  const [editingNews, setEditingNews] = useState<NewsItem | null>(null);
 
   // 스팟 데이터 실시간 리스너
   useEffect(() => {
@@ -135,7 +136,7 @@ const UserApp: React.FC = () => {
 
   // 뉴스 추가 버튼 클릭 핸들러
   const handleAddNewsClick = () => {
-    if (isAuthenticated) {
+    if (currentUser) {
       setShowNewsWriteModal(true);
     } else {
       setShowLoginModal(true);
@@ -143,7 +144,7 @@ const UserApp: React.FC = () => {
   };
 
   // 로그인 성공 시 뉴스 작성 모달 열기
-  const handleLoginSuccess = () => {
+  const handleAuthSuccess = () => {
     setShowNewsWriteModal(true);
   };
 
@@ -151,6 +152,17 @@ const UserApp: React.FC = () => {
   const handleNewsSuccess = () => {
     // 뉴스 리스너가 자동으로 업데이트됨
     console.log('✅ 새로운 소식이 등록되었습니다');
+    setEditingNews(null); // 수정 모드 종료
+  };
+
+  // 뉴스 수정 핸들러
+  const handleEditNews = (newsItem: NewsItem) => {
+    if (currentUser) {
+      setEditingNews(newsItem);
+      setShowNewsWriteModal(true);
+    } else {
+      setShowLoginModal(true);
+    }
   };
 
   if (isLoading) {
@@ -167,7 +179,7 @@ const UserApp: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
       {/* 헤더 */}
-      <UserHeader />
+      <UserHeader onLoginClick={() => setShowLoginModal(true)} />
 
       {/* 메인 컨텐츠 */}
       <main className="max-w-2xl mx-auto px-4 py-6 pb-24">
@@ -180,6 +192,7 @@ const UserApp: React.FC = () => {
           spots={spots}
           onNewsClick={handleNewsClick}
           onAddNewsClick={handleAddNewsClick}
+          onEditNews={handleEditNews}
         />
       </main>
 
@@ -219,19 +232,23 @@ const UserApp: React.FC = () => {
         />
       )}
 
-      {/* 관리자 로그인 모달 */}
-      <AdminLoginModal
+      {/* 로그인/회원가입 모달 */}
+      <AuthModal
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
-        onLoginSuccess={handleLoginSuccess}
+        onSuccess={handleAuthSuccess}
       />
 
-      {/* 뉴스 작성 모달 */}
+      {/* 뉴스 작성/수정 모달 */}
       <NewsWriteModal
         isOpen={showNewsWriteModal}
-        onClose={() => setShowNewsWriteModal(false)}
+        onClose={() => {
+          setShowNewsWriteModal(false);
+          setEditingNews(null);
+        }}
         onSuccess={handleNewsSuccess}
         spots={spots}
+        editingNews={editingNews}
       />
     </div>
   );

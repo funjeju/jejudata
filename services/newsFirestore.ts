@@ -90,16 +90,18 @@ export async function deleteNewsItem(newsId: string): Promise<void> {
  * 모든 뉴스 실시간 구독
  */
 export function subscribeToNews(callback: (news: NewsItem[]) => void): () => void {
-  const q = query(
-    collection(db, "news"),
-    orderBy("priority", "desc"),
-    orderBy("published_at", "desc")
-  );
+  // 일단 정렬 없이 모든 뉴스 가져오기
+  const q = query(collection(db, "news"));
 
   const unsubscribe = onSnapshot(q, (querySnapshot) => {
     const newsArray: NewsItem[] = [];
     querySnapshot.forEach((doc) => {
       const newsItem = parseNewsFromFirestore(doc.data(), doc.id);
+
+      // approved 상태만 필터링
+      if (newsItem.status !== 'approved') {
+        return;
+      }
 
       // 만료된 뉴스 필터링
       if (newsItem.expires_at) {
@@ -110,6 +112,13 @@ export function subscribeToNews(callback: (news: NewsItem[]) => void): () => voi
       }
 
       newsArray.push(newsItem);
+    });
+
+    // 클라이언트에서 정렬 (created_at 기준 최신순)
+    newsArray.sort((a, b) => {
+      const aTime = a.created_at?.seconds || 0;
+      const bTime = b.created_at?.seconds || 0;
+      return bTime - aTime; // 최신순
     });
 
     callback(newsArray);

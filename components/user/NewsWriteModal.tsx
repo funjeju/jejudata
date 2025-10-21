@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc, setDoc, arrayUnion } from 'firebase/firestore';
 import { storage, db } from '../../services/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 import type { NewsItem, Place } from '../../types';
 
 interface NewsWriteModalProps {
@@ -9,6 +10,7 @@ interface NewsWriteModalProps {
   onClose: () => void;
   onSuccess: () => void;
   spots: Place[];
+  editingNews?: NewsItem | null;
 }
 
 type CategoryType = 'new_spot' | 'trending' | 'seasonal' | 'event';
@@ -27,17 +29,31 @@ const CATEGORIES: CategoryOption[] = [
   { type: 'event', label: '이벤트', icon: '🎉', color: 'from-blue-400 to-cyan-500' },
 ];
 
-const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSuccess, spots }) => {
+const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSuccess, spots, editingNews }) => {
+  const { currentUser } = useAuth();
   const [step, setStep] = useState<'category' | 'write'>('category');
   const [selectedCategory, setSelectedCategory] = useState<CategoryType | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [images, setImages] = useState<File[]>([]);
+  const [existingImageUrls, setExistingImageUrls] = useState<string[]>([]); // 수정 시 기존 이미지 URL 저장
   const [selectedSpots, setSelectedSpots] = useState<string[]>([]); // place_id 배열
   const [spotSearchQuery, setSpotSearchQuery] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  // 수정 모드일 때 기존 뉴스 데이터로 폼 채우기
+  useEffect(() => {
+    if (editingNews && isOpen) {
+      setSelectedCategory(editingNews.type);
+      setTitle(editingNews.title);
+      setContent(editingNews.content);
+      setExistingImageUrls(editingNews.images || []);
+      setSelectedSpots(editingNews.related_spot_ids || []);
+      setStep('write');
+    }
+  }, [editingNews, isOpen]);
 
   if (!isOpen) return null;
 
@@ -52,6 +68,7 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
     setTitle('');
     setContent('');
     setImages([]);
+    setExistingImageUrls([]);
     setSelectedSpots([]);
     setSpotSearchQuery('');
     setError('');
@@ -100,7 +117,7 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
 
   const addImages = (files: File[]) => {
     const imageFiles = files.filter(file => file.type.startsWith('image/'));
-    const totalImages = images.length + imageFiles.length;
+    const totalImages = existingImageUrls.length + images.length + imageFiles.length;
 
     if (totalImages > 5) {
       setError('이미지는 최대 5장까지 업로드 가능합니다.');
@@ -113,6 +130,10 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
 
   const removeImage = (index: number) => {
     setImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingImage = (index: number) => {
+    setExistingImageUrls(prev => prev.filter((_, i) => i !== index));
   };
 
   const moveImage = (fromIndex: number, toIndex: number) => {
@@ -140,7 +161,8 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
       return;
     }
 
-    if (images.length === 0) {
+    // 수정 모드일 때는 기존 이미지가 있으면 OK, 생성 모드일 때는 새 이미지 필요
+    if (existingImageUrls.length === 0 && images.length === 0) {
       setError('최소 1장의 이미지를 업로드해주세요.');
       return;
     }
@@ -149,8 +171,8 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
     setError('');
 
     try {
-      // 이미지 업로드
-      const imageUrls: string[] = [];
+      // 새 이미지 업로드
+      const newImageUrls: string[] = [];
       for (let i = 0; i < images.length; i++) {
         const image = images[i];
         const timestamp = Date.now();
@@ -159,33 +181,79 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
 
         await uploadBytes(storageRef, image);
         const url = await getDownloadURL(storageRef);
-        imageUrls.push(url);
+        newImageUrls.push(url);
       }
 
-      // 날짜 정보가 포함된 이미지 데이터 생성
-      const imageDataWithDates = imageUrls.map(url => ({
+      // 기존 이미지 + 새 이미지 합치기
+      const finalImageUrls = [...existingImageUrls, ...newImageUrls];
+
+      // 날짜 정보가 포함된 이미지 데이터 생성 (새 이미지만)
+      const newImageDataWithDates = newImageUrls.map(url => ({
         url,
         uploaded_at: new Date().toISOString(),
       }));
 
-      // Firestore에 저장
+      // 신규 스팟 생성 (신규 카테고리이고 수정 모드가 아닐 때만)
+      let finalRelatedSpots = [...selectedSpots];
+
+      if (selectedCategory === 'new_spot' && selectedSpots.length === 0 && !editingNews) {
+        // 신규 스팟 생성
+        const newSpotId = `new_${Date.now()}`;
+        const newSpotData = {
+          place_id: newSpotId,
+          place_name: title.trim(),
+          description: content.trim(),
+          category: '기타', // 기본 카테고리
+          images: newImageDataWithDates.map(imgData => ({
+            url: imgData.url,
+            uploaded_at: imgData.uploaded_at,
+            source: 'news',
+          })),
+          thumbnail: finalImageUrls[0],
+          location: { lat: 0, lng: 0 }, // 위치 미정
+          address: '제주특별자치도',
+          is_stub: true, // stub 상태 표시
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp(),
+        };
+
+        await setDoc(doc(db, 'spots', newSpotId), newSpotData);
+        finalRelatedSpots.push(newSpotId);
+        console.log(`✅ 신규 스팟 생성됨: ${newSpotId}`);
+      }
+
+      // Firestore에 뉴스 저장 또는 업데이트
       const newsData = {
         title: title.trim(),
         content: content.trim(),
         type: selectedCategory,
-        images: imageUrls, // 기존 호환성 유지
-        image_data: imageDataWithDates, // 날짜 정보 포함
-        thumbnail: imageUrls[0], // 첫 번째 이미지가 썸네일
-        related_spot_ids: selectedSpots, // 선택된 스팟들
-        created_at: serverTimestamp(),
+        images: finalImageUrls, // 전체 이미지 URL
+        thumbnail: finalImageUrls[0], // 첫 번째 이미지가 썸네일
+        related_spot_ids: finalRelatedSpots, // 선택된 스팟들 (또는 새로 생성된 스팟)
+        status: 'approved', // 바로 승인 (관리자 승인 불필요)
         updated_at: serverTimestamp(),
       };
 
-      await addDoc(collection(db, 'news'), newsData);
+      if (editingNews) {
+        // 수정 모드: 기존 뉴스 업데이트
+        await updateDoc(doc(db, 'news', editingNews.id), newsData);
+        console.log(`✅ 뉴스 "${editingNews.id}" 수정됨`);
+      } else {
+        // 생성 모드: 새 뉴스 추가
+        const newNewsData = {
+          ...newsData,
+          author_uid: currentUser?.uid || null,
+          author_email: currentUser?.email || null,
+          submitted_at: serverTimestamp(),
+          created_at: serverTimestamp(),
+        };
+        await addDoc(collection(db, 'news'), newNewsData);
+        console.log(`✅ 새 뉴스 생성됨`);
+      }
 
-      // 관련 스팟들의 이미지 갤러리에 뉴스 이미지 추가
-      if (selectedSpots.length > 0) {
-        for (const placeId of selectedSpots) {
+      // 관련 스팟들의 이미지 갤러리에 새 이미지 추가 (새 이미지가 있을 때만)
+      if (finalRelatedSpots.length > 0 && newImageUrls.length > 0) {
+        for (const placeId of finalRelatedSpots) {
           try {
             // 스팟 문서 찾기 (spots 컬렉션에서 place_id 필드로 검색)
             const spotRef = doc(db, 'spots', placeId);
@@ -196,7 +264,7 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
               const existingImages = spotDoc.data().images || [];
 
               // 새 이미지들을 날짜 정보와 함께 추가
-              const newImages = imageDataWithDates.map(imgData => ({
+              const newImages = newImageDataWithDates.map(imgData => ({
                 url: imgData.url,
                 uploaded_at: imgData.uploaded_at,
                 source: 'news', // 뉴스에서 추가된 이미지임을 표시
@@ -244,7 +312,7 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
         {/* 헤더 */}
         <div className="flex justify-between items-center p-6 border-b">
           <h2 className="text-2xl font-bold text-gray-800">
-            {step === 'category' ? '📰 카테고리 선택' : '✍️ 최신 소식 작성'}
+            {step === 'category' ? '📰 카테고리 선택' : editingNews ? '✏️ 최신 소식 수정' : '✍️ 최신 소식 작성'}
           </h2>
           <button
             onClick={handleClose}
@@ -302,7 +370,7 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
               {/* 이미지 업로드 영역 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  이미지 ({images.length}/5)
+                  이미지 ({existingImageUrls.length + images.length}/5)
                 </label>
 
                 {/* 드래그 앤 드롭 영역 */}
@@ -313,10 +381,10 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
                   className={`
                     border-2 border-dashed rounded-lg p-8 text-center transition-colors
                     ${isDragging ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-gray-400'}
-                    ${images.length >= 5 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                    ${(existingImageUrls.length + images.length) >= 5 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                   `}
                   onClick={() => {
-                    if (images.length < 5) {
+                    if ((existingImageUrls.length + images.length) < 5) {
                       document.getElementById('file-input')?.click();
                     }
                   }}
@@ -336,7 +404,7 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
                       />
                     </svg>
                     <p className="text-gray-600">
-                      {images.length >= 5
+                      {(existingImageUrls.length + images.length) >= 5
                         ? '최대 5장까지 업로드 가능합니다'
                         : '이미지를 드래그하거나 클릭하여 업로드'}
                     </p>
@@ -351,20 +419,47 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
                   multiple
                   onChange={handleFileInput}
                   className="hidden"
-                  disabled={images.length >= 5}
+                  disabled={(existingImageUrls.length + images.length) >= 5}
                 />
 
                 {/* 이미지 프리뷰 */}
-                {images.length > 0 && (
+                {(existingImageUrls.length > 0 || images.length > 0) && (
                   <div className="mt-4 grid grid-cols-5 gap-2">
-                    {images.map((image, index) => (
-                      <div key={index} className="relative group">
+                    {/* 기존 이미지 표시 */}
+                    {existingImageUrls.map((url, index) => (
+                      <div key={`existing-${index}`} className="relative group">
                         <img
-                          src={URL.createObjectURL(image)}
-                          alt={`Preview ${index + 1}`}
+                          src={url}
+                          alt={`기존 이미지 ${index + 1}`}
                           className="w-full h-24 object-cover rounded-lg"
                         />
-                        {index === 0 && (
+                        {index === 0 && existingImageUrls.length > 0 && images.length === 0 && (
+                          <div className="absolute top-1 left-1 bg-indigo-600 text-white text-xs px-2 py-1 rounded">
+                            썸네일
+                          </div>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeExistingImage(index);
+                          }}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                    {/* 새 이미지 표시 */}
+                    {images.map((image, index) => (
+                      <div key={`new-${index}`} className="relative group">
+                        <img
+                          src={URL.createObjectURL(image)}
+                          alt={`새 이미지 ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg"
+                        />
+                        {index === 0 && existingImageUrls.length === 0 && (
                           <div className="absolute top-1 left-1 bg-indigo-600 text-white text-xs px-2 py-1 rounded">
                             썸네일
                           </div>
@@ -380,7 +475,7 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                           </svg>
                         </button>
-                        {/* 순서 변경 버튼 */}
+                        {/* 순서 변경 버튼 (새 이미지끼리만) */}
                         <div className="absolute bottom-1 left-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {index > 0 && (
                             <button
@@ -569,7 +664,7 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
               className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isSubmitting}
             >
-              {isSubmitting ? '등록 중...' : '등록하기'}
+              {isSubmitting ? (editingNews ? '수정 중...' : '등록 중...') : (editingNews ? '수정하기' : '등록하기')}
             </button>
           </div>
         )}

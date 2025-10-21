@@ -113,7 +113,11 @@ const SpotDetailView: React.FC<SpotDetailViewProps> = ({ spot, relatedNews = [],
     return badge ? colorMap[badge] || 'bg-gray-100 text-gray-800' : '';
   };
 
-  const formatTimeAgo = (timestamp: { seconds: number }) => {
+  const formatTimeAgo = (timestamp?: { seconds: number } | null) => {
+    if (!timestamp || !timestamp.seconds) {
+      return '방금 전';
+    }
+
     const now = Date.now() / 1000;
     const diff = now - timestamp.seconds;
 

@@ -30,7 +30,16 @@ const NewsFeedModal: React.FC<NewsFeedModalProps> = ({
     ? news
     : news.filter(item => item.type === filterType);
 
-  const formatDate = (timestamp: { seconds: number }) => {
+  const formatDate = (timestamp?: { seconds: number } | null) => {
+    if (!timestamp || !timestamp.seconds) {
+      return new Date().toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
     const date = new Date(timestamp.seconds * 1000);
     return date.toLocaleDateString('ko-KR', {
       year: 'numeric',
@@ -41,7 +50,11 @@ const NewsFeedModal: React.FC<NewsFeedModalProps> = ({
     });
   };
 
-  const formatTimeAgo = (timestamp: { seconds: number }) => {
+  const formatTimeAgo = (timestamp?: { seconds: number } | null) => {
+    if (!timestamp || !timestamp.seconds) {
+      return '방금 전';
+    }
+
     const now = Date.now() / 1000;
     const diff = now - timestamp.seconds;
 

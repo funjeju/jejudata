@@ -209,7 +209,7 @@ const AddressGpsInput: React.FC<AddressGpsInputProps> = ({
       </div>
 
       {/* GPS 좌표 표시 */}
-      {location && (
+      {location && location.latitude != null && location.longitude != null && (
         <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
           <div className="text-sm text-green-800">
             📍 GPS 좌표: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}

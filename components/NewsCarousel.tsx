@@ -25,7 +25,11 @@ const NewsCarousel: React.FC<NewsCarouselProps> = ({ news, onNewsClick, onViewAl
     setCurrentIndex((prev) => (prev === displayNews.length - 1 ? 0 : prev + 1));
   };
 
-  const formatTimeAgo = (timestamp: { seconds: number }) => {
+  const formatTimeAgo = (timestamp?: { seconds: number } | null) => {
+    if (!timestamp || !timestamp.seconds) {
+      return '방금 전';
+    }
+
     const now = Date.now() / 1000;
     const diff = now - timestamp.seconds;
 

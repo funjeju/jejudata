@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
 import type { NewsItem, Place } from '../../types';
+import { useAuth } from '../../contexts/AuthContext';
+import { doc, deleteDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 
 interface NewsDetailModalProps {
   news: NewsItem;
   relatedSpots: Place[];
   onClose: () => void;
+  onEdit?: (news: NewsItem) => void;
 }
 
-const NewsDetailModal: React.FC<NewsDetailModalProps> = ({ news, relatedSpots, onClose }) => {
+const NewsDetailModal: React.FC<NewsDetailModalProps> = ({ news, relatedSpots, onClose, onEdit }) => {
+  const { currentUser } = useAuth();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handlePrevImage = () => {
     setCurrentImageIndex((prev) => (prev === 0 ? news.images.length - 1 : prev - 1));
@@ -17,6 +23,36 @@ const NewsDetailModal: React.FC<NewsDetailModalProps> = ({ news, relatedSpots, o
   const handleNextImage = () => {
     setCurrentImageIndex((prev) => (prev === news.images.length - 1 ? 0 : prev + 1));
   };
+
+  // 삭제 핸들러
+  const handleDelete = async () => {
+    if (!window.confirm('정말 이 소식을 삭제하시겠습니까?')) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await deleteDoc(doc(db, 'news', news.id));
+      alert('소식이 삭제되었습니다.');
+      onClose();
+    } catch (error) {
+      console.error('삭제 오류:', error);
+      alert('삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // 수정 핸들러
+  const handleEdit = () => {
+    if (onEdit) {
+      onEdit(news);
+      onClose();
+    }
+  };
+
+  // 현재 사용자가 작성자인지 확인
+  const isAuthor = currentUser && news.author_uid === currentUser.uid;
 
   const getTypeLabel = (type: NewsItem['type']) => {
     switch (type) {
@@ -183,14 +219,41 @@ const NewsDetailModal: React.FC<NewsDetailModalProps> = ({ news, relatedSpots, o
           </div>
         </div>
 
-        {/* 푸터 (옵션) */}
-        <div className="border-t p-4 bg-gray-50 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
-          >
-            닫기
-          </button>
+        {/* 푸터 */}
+        <div className="border-t p-4 bg-gray-50 flex justify-between items-center">
+          {/* 작성자 정보 */}
+          <div className="text-sm text-gray-500">
+            {news.author_email && (
+              <span>작성자: {news.author_email.split('@')[0]}</span>
+            )}
+          </div>
+
+          {/* 버튼 그룹 */}
+          <div className="flex gap-2">
+            {isAuthor && (
+              <>
+                <button
+                  onClick={handleEdit}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                >
+                  ✏️ 수정
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isDeleting ? '삭제 중...' : '🗑️ 삭제'}
+                </button>
+              </>
+            )}
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+            >
+              닫기
+            </button>
+          </div>
         </div>
       </div>
     </div>

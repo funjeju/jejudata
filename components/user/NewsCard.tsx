@@ -9,7 +9,11 @@ interface NewsCardProps {
 
 const NewsCard: React.FC<NewsCardProps> = ({ news, relatedSpots, onClick }) => {
   // 시간 포맷팅
-  const formatTimeAgo = (timestamp: { seconds: number }) => {
+  const formatTimeAgo = (timestamp?: { seconds: number } | null) => {
+    if (!timestamp || !timestamp.seconds) {
+      return '방금 전';
+    }
+
     const now = Date.now() / 1000;
     const diff = now - timestamp.seconds;
 

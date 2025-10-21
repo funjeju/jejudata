@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getAuth } from "firebase/auth";
 
 // Firebase 프로젝트 설정 (Firebase 콘솔에서 가져오기)
 const firebaseConfig = {
@@ -23,9 +24,12 @@ const db = getFirestore(app, "databuilder");
 // Firebase Storage 인스턴스 생성
 const storage = getStorage(app);
 
+// Firebase Auth 인스턴스 생성
+const auth = getAuth(app);
+
 // 개발 모드에서 에뮬레이터 사용 (선택사항)
 // if (location.hostname === 'localhost') {
 //   connectFirestoreEmulator(db, 'localhost', 8080);
 // }
 
-export { db, storage };
+export { db, storage, auth };
