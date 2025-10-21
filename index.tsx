@@ -1,6 +1,7 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import App from './App';
 import UserApp from './UserApp';
 import { AuthProvider } from './contexts/AuthContext';
@@ -10,16 +11,16 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
-// URL 기반 라우팅
-// /admin -> CMS (관리자용 App)
-// / -> 사용자용 UserApp
-const isAdminRoute = window.location.pathname === '/admin';
-
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <AuthProvider>
-      {isAdminRoute ? <App /> : <UserApp />}
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <Routes>
+          <Route path="/admin" element={<App />} />
+          <Route path="/" element={<UserApp />} />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );
