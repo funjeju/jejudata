@@ -224,27 +224,27 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialData, onComplete, skip
                 </div>
               )}
 
-              <div className="absolute bottom-0 left-0 w-full p-3 bg-black bg-opacity-50 text-white">
-                  <div className="flex justify-between items-center mb-2">
-                      <div className="text-sm">
+              <div className="absolute bottom-0 left-0 w-full p-2 bg-black bg-opacity-50 text-white">
+                  <div className="flex justify-between items-center mb-1">
+                      <div className="text-xs">
                           📍 <span className="font-semibold">{initialData.weatherData?.location || '제주'}</span>
                       </div>
-                      <div className="text-sm font-semibold">
+                      <div className="text-xs font-semibold">
                           {initialData.weatherData?.weather || '맑음'}
                       </div>
                   </div>
                   <div className="flex justify-around text-center">
                       <div>
-                          <p className="text-xs opacity-80">현재 기온</p>
-                          <p className="font-bold text-lg">{initialData.weatherData?.temp || '분석중...'}</p>
+                          <p className="text-[10px] opacity-80">현재 기온</p>
+                          <p className="font-bold text-sm">{initialData.weatherData?.temp || '분석중...'}</p>
                       </div>
                       <div>
-                          <p className="text-xs opacity-80">습도</p>
-                          <p className="font-bold text-lg">{initialData.weatherData?.humidity || '분석중...'}</p>
+                          <p className="text-[10px] opacity-80">습도</p>
+                          <p className="font-bold text-sm">{initialData.weatherData?.humidity || '분석중...'}</p>
                       </div>
                       <div>
-                          <p className="text-xs opacity-80">풍속</p>
-                          <p className="font-bold text-lg">{initialData.weatherData?.wind || '분석중...'}</p>
+                          <p className="text-[10px] opacity-80">풍속</p>
+                          <p className="font-bold text-sm">{initialData.weatherData?.wind || '분석중...'}</p>
                       </div>
                   </div>
               </div>

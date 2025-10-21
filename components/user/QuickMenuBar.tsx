@@ -49,7 +49,7 @@ const QuickMenuBar: React.FC<QuickMenuBarProps> = ({ onMenuClick }) => {
             `}
           >
             <span className="text-3xl">{item.icon}</span>
-            <span className="text-sm font-semibold">{item.label}</span>
+            <span className="text-xs font-semibold">{item.label}</span>
           </button>
         ))}
       </div>
