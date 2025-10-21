@@ -10,6 +10,22 @@ interface SpotDetailModalProps {
 const SpotDetailModal: React.FC<SpotDetailModalProps> = ({ spot, relatedNews, onClose }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showAllNews, setShowAllNews] = useState(false);
+  const [currentImagePage, setCurrentImagePage] = useState(0);
+
+  // 이미지를 최신순으로 정렬 (uploaded_at이 있는 것 우선, 최신순)
+  const sortedImages = spot.images ? [...spot.images].sort((a, b) => {
+    if (!a.uploaded_at && !b.uploaded_at) return 0;
+    if (!a.uploaded_at) return 1;
+    if (!b.uploaded_at) return -1;
+    return new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime();
+  }) : [];
+
+  const imagesPerPage = 6;
+  const totalPages = Math.ceil(sortedImages.length / imagesPerPage);
+  const currentPageImages = sortedImages.slice(
+    currentImagePage * imagesPerPage,
+    (currentImagePage + 1) * imagesPerPage
+  );
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* 배경 오버레이 */}
@@ -32,20 +48,20 @@ const SpotDetailModal: React.FC<SpotDetailModalProps> = ({ spot, relatedNews, on
           </button>
 
           {/* 이미지 갤러리 */}
-          {spot.images && spot.images.length > 0 && (
+          {sortedImages.length > 0 && (
             <div>
               <div className="relative h-80 bg-gray-200">
                 <img
-                  src={spot.images[currentImageIndex].url}
+                  src={sortedImages[currentImageIndex].url}
                   alt={spot.place_name}
                   className="w-full h-full object-cover"
                 />
 
                 {/* 이미지 네비게이션 */}
-                {spot.images.length > 1 && (
+                {sortedImages.length > 1 && (
                   <>
                     <button
-                      onClick={() => setCurrentImageIndex(prev => prev === 0 ? spot.images.length - 1 : prev - 1)}
+                      onClick={() => setCurrentImageIndex(prev => prev === 0 ? sortedImages.length - 1 : prev - 1)}
                       className="absolute left-2 top-1/2 -translate-y-1/2 bg-white bg-opacity-80 hover:bg-opacity-100 text-gray-800 rounded-full p-2"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -53,7 +69,7 @@ const SpotDetailModal: React.FC<SpotDetailModalProps> = ({ spot, relatedNews, on
                       </svg>
                     </button>
                     <button
-                      onClick={() => setCurrentImageIndex(prev => prev === spot.images.length - 1 ? 0 : prev + 1)}
+                      onClick={() => setCurrentImageIndex(prev => prev === sortedImages.length - 1 ? 0 : prev + 1)}
                       className="absolute right-2 top-1/2 -translate-y-1/2 bg-white bg-opacity-80 hover:bg-opacity-100 text-gray-800 rounded-full p-2"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,9 +80,9 @@ const SpotDetailModal: React.FC<SpotDetailModalProps> = ({ spot, relatedNews, on
                 )}
 
                 {/* 이미지 날짜 표시 */}
-                {spot.images[currentImageIndex].uploaded_at && (
+                {sortedImages[currentImageIndex].uploaded_at && (
                   <div className="absolute bottom-4 left-4 bg-black bg-opacity-60 text-white px-3 py-1.5 rounded-lg text-sm">
-                    📅 {new Date(spot.images[currentImageIndex].uploaded_at).toLocaleDateString('ko-KR', {
+                    📅 {new Date(sortedImages[currentImageIndex].uploaded_at).toLocaleDateString('ko-KR', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'
@@ -75,31 +91,59 @@ const SpotDetailModal: React.FC<SpotDetailModalProps> = ({ spot, relatedNews, on
                 )}
 
                 {/* 이미지 카운터 */}
-                {spot.images.length > 1 && (
+                {sortedImages.length > 1 && (
                   <div className="absolute top-4 right-4 bg-black bg-opacity-60 text-white px-3 py-1 rounded-full text-sm">
-                    {currentImageIndex + 1} / {spot.images.length}
+                    {currentImageIndex + 1} / {sortedImages.length}
                   </div>
                 )}
               </div>
 
-              {/* 썸네일 그리드 */}
-              {spot.images.length > 1 && (
-                <div className="grid grid-cols-6 gap-2 p-3 bg-gray-50">
-                  {spot.images.map((image, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setCurrentImageIndex(index)}
-                      className={`relative aspect-square rounded-lg overflow-hidden ${
-                        index === currentImageIndex ? 'ring-2 ring-indigo-500' : ''
-                      }`}
-                    >
-                      <img
-                        src={image.url}
-                        alt={`${spot.place_name} ${index + 1}`}
-                        className="w-full h-full object-cover hover:opacity-75 transition-opacity"
-                      />
-                    </button>
-                  ))}
+              {/* 썸네일 그리드 (페이지네이션 포함) */}
+              {sortedImages.length > 1 && (
+                <div className="bg-gray-50 p-3">
+                  <div className="grid grid-cols-6 gap-2">
+                    {currentPageImages.map((image, relativeIndex) => {
+                      const absoluteIndex = currentImagePage * imagesPerPage + relativeIndex;
+                      return (
+                        <button
+                          key={absoluteIndex}
+                          onClick={() => setCurrentImageIndex(absoluteIndex)}
+                          className={`relative aspect-square rounded-lg overflow-hidden ${
+                            absoluteIndex === currentImageIndex ? 'ring-2 ring-indigo-500' : ''
+                          }`}
+                        >
+                          <img
+                            src={image.url}
+                            alt={`${spot.place_name} ${absoluteIndex + 1}`}
+                            className="w-full h-full object-cover hover:opacity-75 transition-opacity"
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* 페이지네이션 버튼 */}
+                  {totalPages > 1 && (
+                    <div className="flex justify-center items-center gap-2 mt-3">
+                      <button
+                        onClick={() => setCurrentImagePage(prev => Math.max(0, prev - 1))}
+                        disabled={currentImagePage === 0}
+                        className="px-3 py-1 bg-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        ←
+                      </button>
+                      <span className="text-sm text-gray-600">
+                        {currentImagePage + 1} / {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentImagePage(prev => Math.min(totalPages - 1, prev + 1))}
+                        disabled={currentImagePage === totalPages - 1}
+                        className="px-3 py-1 bg-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        →
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -132,6 +176,61 @@ const SpotDetailModal: React.FC<SpotDetailModalProps> = ({ spot, relatedNews, on
                 </svg>
                 <span>{spot.region}</span>
                 {spot.address && <span className="text-sm">• {spot.address}</span>}
+              </div>
+            )}
+
+            {/* 최신 업데이트 */}
+            {spot.latest_updates && spot.latest_updates.length > 0 && (
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-xl font-bold text-gray-800 flex items-center">
+                    <span className="mr-2">📢</span>
+                    최신 업데이트
+                  </h3>
+                  <span className="text-sm text-gray-500">{spot.latest_updates.length}개</span>
+                </div>
+                <div className="space-y-3">
+                  {spot.latest_updates.slice(0, 3).map((update, index) => (
+                    <div
+                      key={index}
+                      className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-indigo-500 rounded-lg hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start gap-2 mb-2">
+                        <span className="text-lg">
+                          {update.category === 'new_spot' ? '✨' :
+                           update.category === 'trending' ? '🔥' :
+                           update.category === 'seasonal' ? '🌸' :
+                           update.category === 'event' ? '🎉' : '📢'}
+                        </span>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-bold text-indigo-900">{update.title}</p>
+                            <span className="text-xs text-indigo-600">
+                              {update.updated_at && update.updated_at.seconds
+                                ? new Date(update.updated_at.seconds * 1000).toLocaleDateString('ko-KR')
+                                : '최근'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-indigo-800 leading-relaxed">{update.content}</p>
+                        </div>
+                      </div>
+
+                      {/* 업데이트 이미지들 */}
+                      {update.images && update.images.length > 0 && (
+                        <div className="grid grid-cols-4 gap-2 mt-3">
+                          {update.images.slice(0, 4).map((img, idx) => (
+                            <img
+                              key={idx}
+                              src={img}
+                              alt={`${update.title} ${idx + 1}`}
+                              className="w-full h-20 object-cover rounded"
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
