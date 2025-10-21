@@ -11,21 +11,24 @@ const QuickMenuBar: React.FC<QuickMenuBarProps> = ({ onMenuClick }) => {
     {
       id: 'weather' as const,
       icon: '🌤️',
-      label: '실시간날씨챗봇',
+      line1: '실시간',
+      line2: '날씨챗봇',
       color: 'from-blue-400 to-cyan-500',
       hoverColor: 'hover:from-blue-500 hover:to-cyan-600',
     },
     {
       id: 'guide' as const,
       icon: '🗺️',
-      label: '가이드챗봇',
+      line1: '가이드',
+      line2: '챗봇',
       color: 'from-green-400 to-emerald-500',
       hoverColor: 'hover:from-green-500 hover:to-emerald-600',
     },
     {
       id: 'tripPlanner' as const,
       icon: '✈️',
-      label: '여행일정 AI',
+      line1: '여행일정',
+      line2: 'AI',
       color: 'from-purple-400 to-pink-500',
       hoverColor: 'hover:from-purple-500 hover:to-pink-600',
     },
@@ -49,7 +52,10 @@ const QuickMenuBar: React.FC<QuickMenuBarProps> = ({ onMenuClick }) => {
             `}
           >
             <span className="text-3xl">{item.icon}</span>
-            <span className="text-xs font-semibold">{item.label}</span>
+            <div className="text-xs font-semibold text-center leading-tight">
+              <div>{item.line1}</div>
+              <div>{item.line2}</div>
+            </div>
           </button>
         ))}
       </div>
