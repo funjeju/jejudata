@@ -165,6 +165,45 @@ const SpotDetailView: React.FC<SpotDetailViewProps> = ({ spot, relatedNews = [],
           </div>
         </header>
 
+        {/* --- Latest Updates Section --- */}
+        {spot.latest_updates && spot.latest_updates.length > 0 && (
+          <section className="border-t pt-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-4">📢 최신 업데이트</h2>
+            <div className="space-y-3">
+              {spot.latest_updates.slice(0, 3).map((update, index) => (
+                <div
+                  key={index}
+                  className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-indigo-500 p-4 rounded-r-lg"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-indigo-600">
+                        {update.updated_at && update.updated_at.seconds
+                          ? new Date(update.updated_at.seconds * 1000).toLocaleDateString('ko-KR')
+                          : '최근'}
+                      </span>
+                    </div>
+                  </div>
+                  <h3 className="font-bold text-gray-900 mb-1">{update.title}</h3>
+                  <p className="text-sm text-gray-700">{update.content}</p>
+                  {update.images && update.images.length > 0 && (
+                    <div className="mt-3 flex gap-2 overflow-x-auto">
+                      {update.images.slice(0, 3).map((imgUrl, imgIndex) => (
+                        <img
+                          key={imgIndex}
+                          src={imgUrl}
+                          alt={`Update ${index + 1} image ${imgIndex + 1}`}
+                          className="w-20 h-20 object-cover rounded-lg"
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* --- Latest News Section --- */}
         {relatedNews.length > 0 && (
           <section className="border-t pt-6">

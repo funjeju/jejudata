@@ -190,8 +190,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, orooms, news,
         ${isLocationBasedQuery ? '# FILTERED NEARBY DATA (within reasonable distance)' : '# ALL AVAILABLE DATA'}
 
         ## TRAVEL SPOTS (카페, 식당, 관광지 등)
+        **IMPORTANT**: Each spot may have a `latest_updates` field containing recent status updates.
+        When answering questions about current conditions (e.g., "억새 어때?", "꽃 피었어?"),
+        ALWAYS check the latest_updates field first and mention the update date.
         \`\`\`json
-        ${JSON.stringify(relevantSpots, null, 2)}
+        ${JSON.stringify(relevantSpots.map(spot => ({
+          ...spot,
+          latest_updates: spot.latest_updates || []
+        })), null, 2)}
         \`\`\`
 
         ## VOLCANIC CONES (오름 정보)

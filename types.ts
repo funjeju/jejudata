@@ -146,6 +146,16 @@ export interface EditLog {
 }
 
 
+// 스팟 최신 업데이트 정보
+export interface LatestUpdate {
+  news_id: string;           // 연결된 뉴스 ID
+  title: string;             // 업데이트 제목
+  content: string;           // 업데이트 내용
+  updated_at: Timestamp;     // 업데이트 날짜
+  images?: string[];         // 관련 이미지 URL
+  category: 'seasonal' | 'event' | 'new_spot' | 'trending'; // 카테고리
+}
+
 export interface Place {
   place_id: string;
   place_name: string;
@@ -182,6 +192,9 @@ export interface Place {
 
   // 축제/행사 전용 정보
   event_info?: EventInfo | null;
+
+  // 최신 업데이트 정보 (뉴스 연계)
+  latest_updates?: LatestUpdate[] | null;
 
   // For collaboration and versioning
   suggestions?: Record<string, Suggestion[]>;

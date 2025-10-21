@@ -234,9 +234,12 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
         updated_at: serverTimestamp(),
       };
 
+      let newsId: string;
+
       if (editingNews) {
         // 수정 모드: 기존 뉴스 업데이트
         await updateDoc(doc(db, 'news', editingNews.id), newsData);
+        newsId = editingNews.id;
         console.log(`✅ 뉴스 "${editingNews.id}" 수정됨`);
       } else {
         // 생성 모드: 새 뉴스 추가
@@ -247,8 +250,9 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
           submitted_at: serverTimestamp(),
           created_at: serverTimestamp(),
         };
-        await addDoc(collection(db, 'news'), newNewsData);
-        console.log(`✅ 새 뉴스 생성됨`);
+        const newsDocRef = await addDoc(collection(db, 'news'), newNewsData);
+        newsId = newsDocRef.id;
+        console.log(`✅ 새 뉴스 생성됨: ${newsId}`);
       }
 
       // 관련 스팟들의 이미지 갤러리에 새 이미지 추가 (새 이미지가 있을 때만)
@@ -279,12 +283,27 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
                 }
               });
 
+              // latest_updates 업데이트
+              const existingUpdates = spotDoc.data().latest_updates || [];
+              const newUpdate = {
+                news_id: newsId, // 뉴스 ID 사용
+                title: title.trim(),
+                content: content.trim(),
+                updated_at: serverTimestamp(),
+                images: newImageUrls,
+                category: selectedCategory,
+              };
+
+              // 최신 업데이트를 맨 앞에 추가 (최신순 정렬)
+              const updatedLatestUpdates = [newUpdate, ...existingUpdates].slice(0, 5); // 최대 5개까지만 유지
+
               await updateDoc(spotRef, {
                 images: updatedImages,
+                latest_updates: updatedLatestUpdates,
                 updated_at: serverTimestamp(),
               });
 
-              console.log(`✅ 스팟 "${placeId}"에 이미지 ${newImages.length}개 추가됨`);
+              console.log(`✅ 스팟 "${placeId}"에 이미지 ${newImages.length}개 및 최신 업데이트 추가됨`);
             }
           } catch (err) {
             console.error(`❌ 스팟 "${placeId}" 이미지 업데이트 실패:`, err);
