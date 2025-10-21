@@ -4,6 +4,7 @@ import UserHeader from './components/user/UserHeader';
 import QuickMenuBar from './components/user/QuickMenuBar';
 import NewsFeed from './components/user/NewsFeed';
 import SpotDetailModal from './components/user/SpotDetailModal';
+import NewsDetailModal from './components/user/NewsDetailModal';
 import Chatbot from './components/Chatbot';
 import WeatherChatModal from './components/WeatherChatModal';
 import TripPlannerModal from './components/TripPlannerModal';
@@ -31,6 +32,7 @@ const UserApp: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [selectedSpot, setSelectedSpot] = useState<Place | null>(null);
+  const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showNewsWriteModal, setShowNewsWriteModal] = useState(false);
   const [editingNews, setEditingNews] = useState<NewsItem | null>(null);
@@ -134,6 +136,15 @@ const UserApp: React.FC = () => {
     }
   };
 
+  // 챗봇에서 뉴스 상세 열기
+  const handleOpenNews = (newsId: string) => {
+    const newsItem = news.find(n => n.id === newsId);
+    if (newsItem) {
+      setSelectedNews(newsItem);
+      setActiveModal(null); // 챗봇 모달 닫기
+    }
+  };
+
   // 뉴스 추가 버튼 클릭 핸들러
   const handleAddNewsClick = () => {
     if (currentUser) {
@@ -212,6 +223,7 @@ const UserApp: React.FC = () => {
         orooms={orooms}
         news={news}
         onNavigateToSpot={handleNavigateToSpot}
+        onOpenNews={handleOpenNews}
       />
 
       <TripPlannerModal
@@ -229,6 +241,18 @@ const UserApp: React.FC = () => {
             n.auto_apply_to_spot && n.related_spot_ids.includes(selectedSpot.place_id)
           )}
           onClose={() => setSelectedSpot(null)}
+        />
+      )}
+
+      {/* 뉴스 상세 모달 */}
+      {selectedNews && (
+        <NewsDetailModal
+          news={selectedNews}
+          relatedSpots={spots.filter(s =>
+            selectedNews.related_spot_ids.includes(s.place_id)
+          )}
+          onClose={() => setSelectedNews(null)}
+          onEdit={handleEditNews}
         />
       )}
 

@@ -15,12 +15,16 @@ interface ChatbotProps {
   orooms: OroomData[];
   news: NewsItem[];
   onNavigateToSpot: (placeId: string) => void;
+  onOpenNews?: (newsId: string) => void; // 뉴스 상세 열기
 }
 
 interface Recommendation {
   place_id: string;
   place_name: string;
   summary: string;
+  image_url?: string;      // 대표 이미지 URL (일반 추천) 또는 최신 이미지 URL (현재 상태 질문)
+  news_id?: string;        // 최신 업데이트 관련 뉴스 ID
+  updated_at?: string;     // 업데이트 날짜 (현재 상태 질문일 때만)
 }
 
 interface Message {
@@ -30,7 +34,7 @@ interface Message {
 }
 
 
-const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, orooms, news, onNavigateToSpot }) => {
+const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, orooms, news, onNavigateToSpot, onOpenNews }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -80,10 +84,19 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, orooms, news,
                     - WHEN a user asks for travel recommendations and you have enough context, you MUST follow these steps:
                       1. Use the provided JSON data of travel spots as your ONLY source of truth.
                       2. Identify 1 to 3 relevant spots based on the user's query.
-                      3. For EACH recommended spot, write a concise, one-sentence summary.
-                      4. Formulate your final response as a brief introductory sentence, followed by a JSON code block.
-                      5. The JSON object MUST have a single key "recommendations", which is an array of objects.
-                      6. Each object in the array MUST have three keys: "place_id", "place_name", and "summary".
+                      3. Determine if this is a CURRENT STATUS QUERY (e.g., "억새 어때?", "꽃 피었어?", "요즘 어때?", "지금 어떨까?").
+                      4. For EACH recommended spot:
+                         - If CURRENT STATUS QUERY and spot has latest_updates:
+                           * Use the FIRST IMAGE from latest_updates[0].images as "image_url"
+                           * Include latest_updates[0].news_id as "news_id"
+                           * Include formatted date from latest_updates[0].updated_at as "updated_at" (format: "YYYY-MM-DD")
+                           * Write summary based on latest_updates[0] content
+                         - If GENERAL RECOMMENDATION or no latest_updates:
+                           * Use the first image from spot's images array as "image_url"
+                           * Write a general summary about the spot
+                      5. Formulate your final response as a brief introductory sentence, followed by a JSON code block.
+                      6. The JSON object MUST have a single key "recommendations", which is an array of objects.
+                      7. Each object MUST have: "place_id", "place_name", "summary", "image_url" (required). Optional fields: "news_id", "updated_at" (only for current status queries).
                     - DO NOT recommend spots if they are not in the provided JSON data. State that you don't have information instead.
                     - DO NOT add any text after the JSON code block.
 
@@ -96,12 +109,32 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, orooms, news,
                         {
                           "place_id": "P_20250920T004432_YK",
                           "place_name": "새별오름",
-                          "summary": "가을 억새 풍경이 아름다운 제주의 대표적인 오름입니다."
+                          "summary": "가을 억새 풍경이 아름다운 제주의 대표적인 오름입니다.",
+                          "image_url": "https://firebasestorage.googleapis.com/..."
                         },
                         {
                           "place_id": "P_20250920T005703_YR",
                           "place_name": "제주당",
-                          "summary": "새별오름 뷰와 넓은 잔디밭이 특징인 대형 베이커리 카페입니다."
+                          "summary": "새별오름 뷰와 넓은 잔디밭이 특징인 대형 베이커리 카페입니다.",
+                          "image_url": "https://firebasestorage.googleapis.com/..."
+                        }
+                      ]
+                    }
+                    \`\`\`
+
+                    EXAMPLE RESPONSE for a current status query (e.g., "새별오름 억새 어때?"):
+                    새별오름 억새 상태를 알려드릴게요!
+
+                    \`\`\`json
+                    {
+                      "recommendations": [
+                        {
+                          "place_id": "P_20250920T004432_YK",
+                          "place_name": "새별오름",
+                          "summary": "억새가 만개하여 풍성한 상태입니다.",
+                          "image_url": "https://firebasestorage.googleapis.com/...(latest_updates[0].images[0])",
+                          "news_id": "abc123xyz",
+                          "updated_at": "2025-10-21"
                         }
                       ]
                     }
@@ -339,17 +372,53 @@ const Chatbot: React.FC<ChatbotProps> = ({ isOpen, onClose, spots, orooms, news,
                 {msg.recommendations && (
                   <div className="mt-2 space-y-2">
                     {msg.recommendations.map(rec => (
-                      <div key={rec.place_id} className="p-3 bg-white border rounded-lg shadow-sm">
-                        <h4 className="font-bold text-gray-800">{rec.place_name}</h4>
-                        <p className="text-sm text-gray-600 mt-1">{rec.summary}</p>
-                        <Button
-                          onClick={() => onNavigateToSpot(rec.place_id)}
-                          variant="secondary"
-                          size="normal"
-                          className="mt-3 w-full"
-                        >
-                          자세히 보기
-                        </Button>
+                      <div key={rec.place_id} className="bg-white border rounded-lg shadow-sm overflow-hidden">
+                        {/* 대표 이미지 */}
+                        {rec.image_url && (
+                          <div className="w-full h-40 bg-gray-200 relative">
+                            <img
+                              src={rec.image_url}
+                              alt={rec.place_name}
+                              className="w-full h-full object-cover"
+                            />
+                            {/* 업데이트 날짜 배지 (현재 상태 질문일 때만) */}
+                            {rec.updated_at && (
+                              <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs font-semibold px-2 py-1 rounded-full shadow-lg">
+                                📅 {rec.updated_at}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* 콘텐츠 */}
+                        <div className="p-3">
+                          <h4 className="font-bold text-gray-800">{rec.place_name}</h4>
+                          <p className="text-sm text-gray-600 mt-1">{rec.summary}</p>
+
+                          {/* 버튼 그룹 */}
+                          <div className="mt-3 flex gap-2">
+                            <Button
+                              onClick={() => onNavigateToSpot(rec.place_id)}
+                              variant="secondary"
+                              size="normal"
+                              className="flex-1"
+                            >
+                              자세히 보기
+                            </Button>
+
+                            {/* 뉴스 링크 버튼 (news_id가 있을 때만) */}
+                            {rec.news_id && onOpenNews && (
+                              <Button
+                                onClick={() => onOpenNews(rec.news_id!)}
+                                variant="primary"
+                                size="normal"
+                                className="flex-1"
+                              >
+                                📰 최신 소식
+                              </Button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>

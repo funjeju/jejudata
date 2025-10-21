@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc, setDoc, arrayUnion } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc, updateDoc, setDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import { storage, db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import type { NewsItem, Place } from '../../types';
@@ -285,11 +285,12 @@ const NewsWriteModal: React.FC<NewsWriteModalProps> = ({ isOpen, onClose, onSucc
 
               // latest_updates 업데이트
               const existingUpdates = spotDoc.data().latest_updates || [];
+              const now = Timestamp.now(); // serverTimestamp() 대신 Timestamp.now() 사용
               const newUpdate = {
                 news_id: newsId, // 뉴스 ID 사용
                 title: title.trim(),
                 content: content.trim(),
-                updated_at: serverTimestamp(),
+                updated_at: now, // Firestore Timestamp 객체
                 images: newImageUrls,
                 category: selectedCategory,
               };

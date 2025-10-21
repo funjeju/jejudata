@@ -97,7 +97,23 @@ const AttributeItem: React.FC<{ label: string; value: string | string[]; baseOpt
 }
 
 const SpotDetailView: React.FC<SpotDetailViewProps> = ({ spot, relatedNews = [], onBack, onEdit, onAddSuggestion, onResolveSuggestion }) => {
+  const [currentImagePage, setCurrentImagePage] = useState(0);
   const commonCommentableProps = { spot, onAddSuggestion, onResolveSuggestion };
+
+  // 이미지를 최신순으로 정렬 (uploaded_at이 있는 것 우선, 최신순)
+  const sortedImages = spot.images ? [...spot.images].sort((a: any, b: any) => {
+    if (!a.uploaded_at && !b.uploaded_at) return 0;
+    if (!a.uploaded_at) return 1;
+    if (!b.uploaded_at) return -1;
+    return new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime();
+  }) : [];
+
+  const imagesPerPage = 6;
+  const totalPages = Math.ceil(sortedImages.length / imagesPerPage);
+  const currentPageImages = sortedImages.slice(
+    currentImagePage * imagesPerPage,
+    (currentImagePage + 1) * imagesPerPage
+  );
 
   const getBadgeColor = (badge?: NewsItem['badge']) => {
     const colorMap: Record<string, string> = {
@@ -142,14 +158,48 @@ const SpotDetailView: React.FC<SpotDetailViewProps> = ({ spot, relatedNews = [],
 
       <Card className="space-y-8">
         {/* --- Image Gallery --- */}
-        {spot.images && spot.images.length > 0 && (
-          <div className={`grid gap-4 ${spot.images.length > 1 ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-1'}`}>
-            {spot.images.map((image, index) => (
-              <figure key={index} className="space-y-2">
-                <img src={image.url} alt={image.caption || `Image ${index + 1}`} className="w-full h-48 object-cover rounded-lg shadow-md" />
-                {image.caption && <figcaption className="text-center text-sm text-gray-500">{image.caption}</figcaption>}
-              </figure>
-            ))}
+        {sortedImages.length > 0 && (
+          <div>
+            <div className="flex justify-between items-center mb-3">
+              <h2 className="text-xl font-bold text-gray-800">이미지 갤러리</h2>
+              <span className="text-sm text-gray-500">총 {sortedImages.length}개</span>
+            </div>
+            <div className={`grid gap-4 ${currentPageImages.length > 1 ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-1'}`}>
+              {currentPageImages.map((image: any, index) => (
+                <figure key={index} className="space-y-2">
+                  <img src={image.url} alt={image.caption || `Image ${index + 1}`} className="w-full h-48 object-cover rounded-lg shadow-md" />
+                  {image.caption && <figcaption className="text-center text-sm text-gray-500">{image.caption}</figcaption>}
+                  {image.uploaded_at && (
+                    <p className="text-xs text-gray-400 text-center">
+                      📅 {new Date(image.uploaded_at).toLocaleDateString('ko-KR')}
+                    </p>
+                  )}
+                </figure>
+              ))}
+            </div>
+
+            {/* 페이지네이션 버튼 */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center gap-2 mt-4">
+                <button
+                  onClick={() => setCurrentImagePage(prev => Math.max(0, prev - 1))}
+                  disabled={currentImagePage === 0}
+                  className="px-3 py-1 bg-white border rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  ←
+                </button>
+                <span className="text-sm text-gray-600">
+                  {currentImagePage + 1} / {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentImagePage(prev => Math.min(totalPages - 1, prev + 1))}
+                  disabled={currentImagePage === totalPages - 1}
+                  className="px-3 py-1 bg-white border rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  →
+                </button>
+              </div>
+            )}
           </div>
         )}
 
